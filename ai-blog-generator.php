@@ -191,11 +191,13 @@ class ai_blog_post_generator {
     }
 
     public function generate_post($post_title, $post_content, $seo_terms) {
-        // Create new post
+        $default_post_status = $this->ai_post_default_status ?: 'draft';
+		
+		// Create new post
         $post_data = array(
             'post_title' => $post_title,
             'post_content' => $post_content,
-            'post_status' => $this->ai_post_default_status,
+            'post_status' => $default_post_status,
             'post_author' => get_current_user_id(),
             'post_type' => 'post',
         );
