@@ -172,7 +172,7 @@ class ai_blog_post_generator {
         exit;
     }
 	
-	public function generate_blog_post($prompt = '', $seo_terms = '', $post_category, $post_comment_status) {
+	public function generate_blog_post($prompt, $seo_terms, $post_category, $post_comment_status) {
 		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms;
 		
 		$default_post_length = $this->ai_default_post_length ?: '400';
