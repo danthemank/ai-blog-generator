@@ -10,6 +10,8 @@ class ai_blog_post_generator {
     private $openai_api_key;
 	private $ai_default_post_length;
 	private $ai_post_default_status;
+	private $ai_post_default_category;
+	private $ai_post_default_comment_status;
 	private $plugin_name;
 	private $version;
 
@@ -20,6 +22,8 @@ class ai_blog_post_generator {
         $this->openai_api_key = get_option('ai_blog_generator_api_key');
 		$this->ai_default_post_length = get_option('ai_default_post_length');
 		$this->ai_post_default_status = get_option('ai_post_default_status');
+		$this->ai_post_default_category = get_option('ai_post_default_category');
+		$this->ai_post_default_comment_status = get_option('ai_post_default_comment_status');
 
         add_action('admin_menu', array($this, 'add_menu_link'));
         add_action('admin_post_generate_blog_post', array($this, 'handle_generator_form_submission'));
@@ -44,6 +48,41 @@ class ai_blog_post_generator {
     }
 
     public function render_generator_page() {
+		if(isset($_GET['new_post']) && $_GET['new_post'] !== '') {
+			echo '<div class="notice notice-success is-dismissible">';
+			echo "<p>New post successfully created!</p>";
+			echo "<p>" . esc_html( get_the_title($_GET['new_post']) ) . "</p>";
+			
+			//Display excerpt
+			
+			$categories = get_the_category($_GET['new_post']);
+			if ( ! empty( $categories ) ) {
+				echo '<p>In the <a href="' . esc_url( get_category_link( $categories[0]->term_id ) ) . '">' . esc_html( $categories[0]->name ) . '</a> category with tags: ';
+			}
+			
+			$post_tags = get_the_tags($_GET['new_post']);
+			$count = 0;
+
+			if ( ! empty( $post_tags ) ) {
+				foreach ( $post_tags as $tag ) {
+					echo '<a href="' . esc_attr( get_tag_link( $tag->term_id ) ) . '">' . __( $tag->name ) . '</a>';
+					if($count !== count($post_tags) - 1) { echo ', '; }
+					$count++;
+				}
+			}
+			
+			echo '</p>';
+			
+			echo "<p><a href='" . site_url( '/wp-admin/post.php?post=' . $_GET['new_post'] . '&action=edit' ) . "'>Edit Post</a></p>";
+			echo '</div>';
+		}
+		
+		if(isset($_GET['error']) && $_GET['error'] !== '') {
+			echo '<div class="notice notice-error is-dismissible">';
+			echo "<p>There was an issue generating the blog post! Please contact support@mediatech.group and share this error message:</a></p>";
+			echo "<p>" . $_GET['error'] . "</p>";
+			echo '</div>';
+		}
         ?>
         <div class="wrap">
             <div style="width:100%;display: flex;align-items: center;">
@@ -66,6 +105,42 @@ class ai_blog_post_generator {
 							<input type="text" style="width:100%;" id="ai-seo-terms" name="ai_blog_generator_seo_terms">
 						</td>
                     </tr>
+					<tr>
+                        <th scope="row"><label for="ai_post_default_category">Post Category</label></th>
+                        <td>
+							<?php
+								$categories = get_categories(array(
+									'taxonomy' => 'category',
+									'hide_empty' => false
+								));
+
+								if (!empty($categories)) {		
+								?>
+									<select id="ai_post_default_category" name="ai_post_default_category">
+										<?php foreach ($categories as $category) { ?>
+											<option value="<?php echo esc_attr($category->term_id); ?>"<?php if($this->ai_post_default_category == esc_attr($category->term_id)) { echo " selected='selected'"; } ?>>
+												<?php echo esc_html($category->name); ?>
+											</option>
+										<?php } ?>
+									</select>
+								<?php
+								}
+								else {
+									echo 'No categories found. Add your categories <a href="' . site_url( '/wp-admin/edit-tags.php?taxonomy=category' ) . '">here</a>.';
+								}
+							?>
+						</td>
+                    </tr>
+					<tr>
+                        <th scope="row"><label for="ai_post_default_comment_status">Allow Comments</label></th>
+                        <td>
+							<select id="ai_post_default_comment_status" name="ai_post_default_comment_status">
+								<option value="">Choose</option>
+								<option value="open"<?php if($this->ai_post_default_comment_status == "open") { echo " selected='selected'"; } ?>>Allow Comments</option>
+								<option value="closed"<?php if($this->ai_post_default_comment_status == "closed") { echo " selected='selected'"; } ?>>Disallow Comments</option>
+							</select>
+						</td>
+                    </tr>
                 </table>
                 <?php wp_nonce_field('generate_blog_post', 'generate_blog_post_nonce'); ?>
                 <?php
@@ -86,16 +161,18 @@ class ai_blog_post_generator {
             if (isset($_POST['ai_blog_generator_prompt']) && isset($_POST['ai_blog_generator_seo_terms'])) {
                 $prompt = sanitize_text_field($_POST['ai_blog_generator_prompt']);
                 $seo_terms = sanitize_text_field($_POST['ai_blog_generator_seo_terms']);
+				$post_category = $_POST['ai_post_default_category'];
+				$post_comment_status = $_POST['ai_post_default_comment_status'];
 
                 if (!empty($prompt)) {
-                    $this->generate_blog_post($prompt, $seo_terms);
+                    $this->generate_blog_post($prompt, $seo_terms, $post_category, $post_comment_status);
                 }
             }
         }
         exit;
     }
 	
-	public function generate_blog_post($prompt = '', $seo_terms = '') {
+	public function generate_blog_post($prompt = '', $seo_terms = '', $post_category, $post_comment_status) {
 		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms;
 		
 		$default_post_length = $this->ai_default_post_length ?: '400';
@@ -165,8 +242,8 @@ class ai_blog_post_generator {
 					 // Wrap section titles in <h3> tags
 					$generated_content = preg_replace('/\n([A-Za-z\s:]+)\n/', "\n<h3>$1</h3>\n", $generated_content);
 
-					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms);
-					echo "New post successfully created! <a href='/wp-admin/post.php?post=" . $new_post . "&action=edit'>Edit Post</a>";
+					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status);
+					$redirect_link = site_url( '/wp-admin/edit.php?page=ai-blog-generator&new_post=' . $new_post );
 				}
 				else {
 					echo var_dump($body);
@@ -182,7 +259,12 @@ class ai_blog_post_generator {
 
 				// Log or display the error message
 				error_log('ai API error: ' . $error_message);
+				
+				$redirect_link = site_url( '/wp-admin/edit.php?page=ai-blog-generator&error=' . $error_message );
 			}
+			
+			wp_redirect($redirect_link);
+			exit;
 		}
 		else {
 			echo "There was an error generating the post content.";
@@ -190,16 +272,24 @@ class ai_blog_post_generator {
 		}
     }
 
-    public function generate_post($post_title, $post_content, $seo_terms) {
+    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status) {
         $default_post_status = $this->ai_post_default_status ?: 'draft';
+		$default_post_category = $this->ai_post_default_status ?: '0';
+		$default_post_comment_status = $this->ai_post_default_comment_status ?: 'closed';
+		if(!isset($post_category) || $post_category == '') { $post_category = $default_post_category; }
+		if(!isset($post_comment_status) || $post_comment_status == '') { $post_comment_status = $default_post_comment_status; }
 		
 		// Create new post
         $post_data = array(
-            'post_title' => $post_title,
-            'post_content' => $post_content,
-            'post_status' => $default_post_status,
-            'post_author' => get_current_user_id(),
-            'post_type' => 'post',
+            'post_title'     => $post_title,
+            'post_content'   => $post_content,
+            'post_status'    => $default_post_status,
+            'post_author'    => get_current_user_id(),
+            'post_type'      => 'post',
+			'post_excerpt'   => '',
+			'comment_status' => $post_comment_status,
+			'post_category'  => array( $post_category ),
+			'tags_input'     => $seo_terms,
         );
 
         $post_id = wp_insert_post($post_data);
@@ -227,6 +317,8 @@ class ai_blog_post_generator {
         register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_api_key');
 		register_setting('ai_blog_generator_settings_group', 'ai_default_post_length');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_status');
+		register_setting('ai_blog_generator_settings_group', 'ai_post_default_category');
+		register_setting('ai_blog_generator_settings_group', 'ai_post_default_comment_status');
 		
 		add_settings_section(
 			'post_generator_main_section',
@@ -256,6 +348,22 @@ class ai_blog_post_generator {
 			'ai_post_default_status',
 			'Default Post Status',
 			array($this, 'ai_post_default_status_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
+		add_settings_field(
+			'ai_post_default_category',
+			'Default Post Status',
+			array($this, 'ai_post_default_category_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
+		add_settings_field(
+			'ai_post_default_comment_status',
+			'Default Post Status',
+			array($this, 'ai_post_default_comment_status_callback'),
 			'ai_blog_generator_settings_group',
 			'post_generator_main_section'
 		);
@@ -290,10 +398,44 @@ class ai_blog_post_generator {
 		<?php
 	}
 	
+	public function ai_post_default_category_callback() {
+		$categories = get_categories(array(
+			'taxonomy' => 'category',
+			'hide_empty' => false
+		));
+
+		if (!empty($categories)) {		
+		?>
+			<select id="ai_post_default_category" name="ai_post_default_category">
+				<?php foreach ($categories as $category) { ?>
+					<option value="<?php echo esc_attr($category->term_id); ?>"<?php if($this->ai_post_default_category == esc_attr($category->term_id)) { echo " selected='selected'"; } ?>>
+						<?php echo esc_html($category->name); ?>
+					</option>
+				<?php } ?>
+			</select>
+		<?php
+		}
+		else {
+			echo 'No categories found. Add your categories <a href="' . site_url( '/wp-admin/edit-tags.php?taxonomy=category' ) . '">here</a>.';
+		}
+	}
+	
+	public function ai_post_default_comment_status_callback() {
+		?>
+		<select id="ai_post_default_comment_status" name="ai_post_default_comment_status">
+			<option value="">Choose</option>
+			<option value="open"<?php if($this->ai_post_default_comment_status == "open") { echo " selected='selected'"; } ?>>Allow Comments</option>
+			<option value="closed"<?php if($this->ai_post_default_comment_status == "closed") { echo " selected='selected'"; } ?>>Disallow Comments</option>
+		</select>
+		<?php
+	}
+	
 	public function save_post_generator_plugin_options($input) {
 		update_option('ai_blog_generator_api_key', sanitize_text_field($input['ai-api-key']));
 		update_option('ai_default_post_length', sanitize_text_field($input['default_post_length']));
 		update_option('ai_post_default_status', sanitize_text_field($input['ai_post_default_status']));
+		update_option('ai_post_default_category', sanitize_text_field($input['ai_post_default_category']));
+		update_option('ai_post_default_comment_status', sanitize_text_field($input['ai_post_default_comment_status']));
 	}
 }
 
