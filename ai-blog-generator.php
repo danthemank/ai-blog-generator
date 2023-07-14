@@ -1,9 +1,15 @@
 <?php
 /**
  * Plugin Name: AI Blog Post Generator
+ * Plugin URI: https://mediatech.group
  * Description: Generate blog posts using artificial intelligence tools.
  * Author: Media & Technology Group, LLC
- * Version: 1.1
+ * Author URI: https://mediatech.group
+ * Version: 1.2
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Update URI: 'https://mediatech.group/plugin-updates/ai-blog-post-generator/
+ * Text Domain: ai-blog-post-generator
+ * Domain Path: /languages
  */
 
 class ai_blog_post_generator {
@@ -17,7 +23,7 @@ class ai_blog_post_generator {
 
     public function __construct() {
 		$this->plugin_name = 'AI Blog Post Generator';
-		$this->version = '1.1';
+		$this->version = '1.2';
 		
         $this->openai_api_key = get_option('ai_blog_generator_api_key');
 		$this->ai_default_post_length = get_option('ai_default_post_length');
@@ -30,7 +36,51 @@ class ai_blog_post_generator {
         add_action('admin_init', array($this, 'register_settings'));
 		
 		add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+		
+		add_filter( 'plugins_api', array( $this, 'ai_blog_post_generator_plugin_view_version_details' ), 9999, 3 );
+		
+		add_filter( 'update_plugins_https://mediatech.group', function( $update, array $plugin_data, string $plugin_file, $locales ) {
+			// Log a message to indicate that the update check is triggered
+			error_log( 'Plugin update check triggered for AI Blog Post Generator.' );
+			
+			if ( $plugin_file !== 'ai-blog-generator/ai-blog-generator.php' ) return $update;
+			if ( ! empty( $update ) ) return $update;
+			$changelog = $this->ai_blog_post_generator_plugin_request();
+			if ( ! version_compare( $plugin_data['Version'], $changelog->latest_version, '<' ) ) return $update;
+	
+			return [
+				'slug' => 'ai-blog-post-generator',
+				'version' => $changelog->latest_version,
+				'url' => $plugin_data['PluginURI'],
+				'package' => $changelog->download_url,
+			];   
+		}, 9999, 4 );
     }
+	
+	public function ai_blog_post_generator_plugin_view_version_details( $res, $action, $args ) {
+		error_log( 'Plugin update check triggered for AI Blog Post Generator.' );
+		if ( $action !== 'plugin_information' ) return $res;
+		if ( $args->slug !== 'ai-blog-post-generator' ) return $res;
+		$res = new stdClass();
+		$res->name = 'AI Blog Post Generator';
+		$res->slug = 'ai-blog-post-generator';
+		$res->path = 'ai-blog-generator/ai-blog-generator.php';
+		$res->sections = array(
+		  'description' => 'This plugin allows you to generate a blog post based on a provided topic idea and SEO terms using AI.',
+		);
+		$changelog = ai_blog_post_generator_plugin_request();
+		$res->version = $changelog->latest_version;
+		$res->download_link = $changelog->download_url;   
+		return $res;
+	}
+	 
+	public function ai_blog_post_generator_plugin_request() {
+		$access = wp_remote_get( 'https://mediatech.group/plugin-updates/ai-blog-post-generator/info.json', array( 'timeout' => 10,   'headers' => array( 'Accept' => 'application/json' )   ) );
+		if ( ! is_wp_error( $access ) && 200 === wp_remote_retrieve_response_code( $access ) ) {
+			 $result = json_decode( wp_remote_retrieve_body( $access ) );
+			 return $result;
+		}
+	}
 	
 	public function enqueue_admin_scripts() {
 		wp_enqueue_script(
@@ -48,6 +98,7 @@ class ai_blog_post_generator {
     }
 
     public function render_generator_page() {
+		error_log( 'Testing Log' );
 		if(isset($_GET['new_post']) && $_GET['new_post'] !== '') {
 			echo '<div class="notice notice-success is-dismissible">';
 			echo "<p>New post successfully created!</p>";
