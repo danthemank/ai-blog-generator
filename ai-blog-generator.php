@@ -40,7 +40,6 @@ class ai_blog_post_generator {
 		add_filter( 'plugins_api', array( $this, 'ai_blog_post_generator_plugin_view_version_details' ), 9999, 3 );
 		
 		add_filter( 'update_plugins_https://mediatech.group', function( $update, array $plugin_data, string $plugin_file, $locales ) {
-			// Log a message to indicate that the update check is triggered
 			error_log( 'Plugin update check triggered for AI Blog Post Generator.' );
 			
 			if ( $plugin_file !== 'ai-blog-generator/ai-blog-generator.php' ) return $update;
