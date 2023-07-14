@@ -12,6 +12,8 @@
  * Domain Path: /languages
  */
 
+defined( 'ABSPATH' ) || exit;
+
 class ai_blog_post_generator {
     private $openai_api_key;
 	private $ai_default_post_length;
@@ -20,10 +22,16 @@ class ai_blog_post_generator {
 	private $ai_post_default_comment_status;
 	private $plugin_name;
 	private $version;
+	public $cache_key;
+	public $cache_allowed;
+	public $plugin_slug;
 
     public function __construct() {
 		$this->plugin_name = 'AI Blog Post Generator';
 		$this->version = '1.2';
+		$this->cache_key = 'ai_blog_post_gen_upd';
+		$this->cache_allowed = false;
+		$this->plugin_slug = plugin_basename( __DIR__ );
 		
         $this->openai_api_key = get_option('ai_blog_generator_api_key');
 		$this->ai_default_post_length = get_option('ai_default_post_length');
@@ -37,47 +45,136 @@ class ai_blog_post_generator {
 		
 		add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
 		
-		add_filter( 'plugins_api', array( $this, 'ai_blog_post_generator_plugin_view_version_details' ), 9999, 3 );
-		
-		add_filter( 'update_plugins_https://mediatech.group', function( $update, array $plugin_data, string $plugin_file, $locales ) {
-			error_log( 'Plugin update check triggered for AI Blog Post Generator.' );
-			
-			if ( $plugin_file !== 'ai-blog-generator/ai-blog-generator.php' ) return $update;
-			if ( ! empty( $update ) ) return $update;
-			$changelog = $this->ai_blog_post_generator_plugin_request();
-			if ( ! version_compare( $plugin_data['Version'], $changelog->latest_version, '<' ) ) return $update;
-	
-			return [
-				'slug' => 'ai-blog-post-generator',
-				'version' => $changelog->latest_version,
-				'url' => $plugin_data['PluginURI'],
-				'package' => $changelog->download_url,
-			];   
-		}, 9999, 4 );
+		add_filter( 'plugins_api', array( $this, 'info' ), 20, 3 );
+		add_filter( 'site_transient_update_plugins', array( $this, 'update' ) );
+		add_action( 'upgrader_process_complete', array( $this, 'purge' ), 10, 2 );
     }
 	
-	public function ai_blog_post_generator_plugin_view_version_details( $res, $action, $args ) {
-		error_log( 'Plugin update check triggered for AI Blog Post Generator.' );
-		if ( $action !== 'plugin_information' ) return $res;
-		if ( $args->slug !== 'ai-blog-post-generator' ) return $res;
+	public function request() {
+		error_log('request function');
+		$remote = get_transient( $this->cache_key );
+
+		if( false === $remote || ! $this->cache_allowed ) {
+			error_log('getting remote');
+			$remote = wp_remote_get(
+				'https://mediatech.group/plugin-updates/ai-blog-post-generator/info.json',
+				array(
+					'timeout' => 10,
+					'headers' => array(
+						'Accept' => 'application/json'
+					)
+				)
+			);
+
+			if(
+				is_wp_error( $remote )
+				|| 200 !== wp_remote_retrieve_response_code( $remote )
+				|| empty( wp_remote_retrieve_body( $remote ) )
+			) {
+				error_log('error getting remote');
+				return false;
+			}
+
+			set_transient( $this->cache_key, $remote, DAY_IN_SECONDS );
+		}
+
+		$remote = json_decode( wp_remote_retrieve_body( $remote ) );
+		error_log($remote);
+		return $remote;
+	}
+	
+	function info( $res, $action, $args ) {
+		// print_r( $action );
+		// print_r( $args );
+		error_log('info function');
+
+		// do nothing if you're not getting plugin information right now
+		if( 'plugin_information' !== $action ) {
+			error_log('not information action');
+			return $res;
+		}
+
+		// do nothing if it is not our plugin
+		if( $this->plugin_slug !== $args->slug ) {
+			error_log('not our plugin');
+			return $res;
+		}
+
+		// get updates
+		$remote = $this->request();
+
+		if( ! $remote ) {
+			error_log('remote did not work');
+			return $res;
+		}
+
 		$res = new stdClass();
-		$res->name = 'AI Blog Post Generator';
-		$res->slug = 'ai-blog-post-generator';
-		$res->path = 'ai-blog-generator/ai-blog-generator.php';
+
+		$res->name = $remote->name;
+		$res->slug = $remote->slug;
+		$res->version = $remote->version;
+		$res->tested = $remote->tested;
+		$res->requires = $remote->requires;
+		$res->author = $remote->author;
+		$res->author_profile = $remote->author_profile;
+		$res->download_link = $remote->download_url;
+		$res->trunk = $remote->download_url;
+		$res->requires_php = $remote->requires_php;
+		$res->last_updated = $remote->last_updated;
+
 		$res->sections = array(
-		  'description' => 'This plugin allows you to generate a blog post based on a provided topic idea and SEO terms using AI.',
+			'description' => $remote->sections->description,
+			'installation' => $remote->sections->installation,
+			'changelog' => $remote->sections->changelog
 		);
-		$changelog = ai_blog_post_generator_plugin_request();
-		$res->version = $changelog->latest_version;
-		$res->download_link = $changelog->download_url;   
+
+		if( ! empty( $remote->banners ) ) {
+			$res->banners = array(
+				'low' => $remote->banners->low,
+				'high' => $remote->banners->high
+			);
+		}
+
 		return $res;
 	}
-	 
-	public function ai_blog_post_generator_plugin_request() {
-		$access = wp_remote_get( 'https://mediatech.group/plugin-updates/ai-blog-post-generator/info.json', array( 'timeout' => 10,   'headers' => array( 'Accept' => 'application/json' )   ) );
-		if ( ! is_wp_error( $access ) && 200 === wp_remote_retrieve_response_code( $access ) ) {
-			 $result = json_decode( wp_remote_retrieve_body( $access ) );
-			 return $result;
+	
+	public function update( $transient ) {
+		error_log('update function');
+		if ( empty($transient->checked ) ) {
+			error_log('transient');
+			return $transient;
+		}
+
+		$remote = $this->request();
+
+		if(
+			$remote
+			&& version_compare( $this->version, $remote->version, '<' )
+			&& version_compare( $remote->requires, get_bloginfo( 'version' ), '<=' )
+			&& version_compare( $remote->requires_php, PHP_VERSION, '<' )
+		) {
+			error_log('version check success');
+			$res = new stdClass();
+			$res->slug = $this->plugin_slug;
+			$res->plugin = plugin_basename( __FILE__ );
+			$res->new_version = $remote->version;
+			$res->tested = $remote->tested;
+			$res->package = $remote->download_url;
+
+			$transient->response[ $res->plugin ] = $res;
+		}
+
+		return $transient;
+	}
+
+	public function purge( $upgrader, $options ){
+		if (
+			$this->cache_allowed
+			&& 'update' === $options['action']
+			&& 'plugin' === $options[ 'type' ]
+		) {
+			// just clean the cache when new plugin version is installed
+			delete_transient( $this->cache_key );
 		}
 	}
 	
