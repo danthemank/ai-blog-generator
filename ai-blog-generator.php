@@ -5,7 +5,7 @@
  * Description: Generate blog posts using artificial intelligence tools.
  * Author: Media & Technology Group, LLC
  * Author URI: https://mediatech.group
- * Version: 1.2
+ * Version: 1.7
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Update URI: 'https://mediatech.group/plugin-updates/ai-blog-post-generator/
  * Text Domain: ai-blog-post-generator
@@ -15,11 +15,15 @@
 defined( 'ABSPATH' ) || exit;
 
 class ai_blog_post_generator {
-    private $openai_api_key;
+    private $license_key;
+	private $license_isactive;
+	private $openai_api_key;
 	private $ai_default_post_length;
 	private $ai_post_default_status;
 	private $ai_post_default_category;
 	private $ai_post_default_comment_status;
+	private $ai_default_generate_excerpt;
+	private $ai_default_excerpt_length;
 	private $plugin_name;
 	private $version;
 	public $cache_key;
@@ -28,16 +32,21 @@ class ai_blog_post_generator {
 
     public function __construct() {
 		$this->plugin_name = 'AI Blog Post Generator';
-		$this->version = '1.2';
+		$this->version = '1.7';
 		$this->cache_key = 'ai_blog_post_gen_upd';
 		$this->cache_allowed = false;
 		$this->plugin_slug = plugin_basename( __DIR__ );
+		
+		$this->license_key = get_option('ai_blog_generator_license_key');
+		$this->license_isactive = get_option('ai_blog_generator_license_isactive');
 		
         $this->openai_api_key = get_option('ai_blog_generator_api_key');
 		$this->ai_default_post_length = get_option('ai_default_post_length');
 		$this->ai_post_default_status = get_option('ai_post_default_status');
 		$this->ai_post_default_category = get_option('ai_post_default_category');
 		$this->ai_post_default_comment_status = get_option('ai_post_default_comment_status');
+		$this->ai_default_generate_excerpt = get_option('ai_default_generate_excerpt');
+		$this->ai_default_excerpt_length = get_option('ai_default_excerpt_length');
 
         add_action('admin_menu', array($this, 'add_menu_link'));
         add_action('admin_post_generate_blog_post', array($this, 'handle_generator_form_submission'));
@@ -51,13 +60,11 @@ class ai_blog_post_generator {
     }
 	
 	public function request() {
-		error_log('request function');
 		$remote = get_transient( $this->cache_key );
 
 		if( false === $remote || ! $this->cache_allowed ) {
-			error_log('getting remote');
 			$remote = wp_remote_get(
-				'https://mediatech.group/plugin-updates/ai-blog-post-generator/info.json',
+				'https://mediatech.group/wp-content/plugin-updates/ai-blog-post-generator/info.json',
 				array(
 					'timeout' => 10,
 					'headers' => array(
@@ -71,7 +78,6 @@ class ai_blog_post_generator {
 				|| 200 !== wp_remote_retrieve_response_code( $remote )
 				|| empty( wp_remote_retrieve_body( $remote ) )
 			) {
-				error_log('error getting remote');
 				return false;
 			}
 
@@ -79,24 +85,21 @@ class ai_blog_post_generator {
 		}
 
 		$remote = json_decode( wp_remote_retrieve_body( $remote ) );
-		error_log($remote);
+
 		return $remote;
 	}
 	
 	function info( $res, $action, $args ) {
 		// print_r( $action );
 		// print_r( $args );
-		error_log('info function');
 
 		// do nothing if you're not getting plugin information right now
 		if( 'plugin_information' !== $action ) {
-			error_log('not information action');
 			return $res;
 		}
 
 		// do nothing if it is not our plugin
 		if( $this->plugin_slug !== $args->slug ) {
-			error_log('not our plugin');
 			return $res;
 		}
 
@@ -104,7 +107,6 @@ class ai_blog_post_generator {
 		$remote = $this->request();
 
 		if( ! $remote ) {
-			error_log('remote did not work');
 			return $res;
 		}
 
@@ -141,7 +143,6 @@ class ai_blog_post_generator {
 	public function update( $transient ) {
 		error_log('update function');
 		if ( empty($transient->checked ) ) {
-			error_log('transient');
 			return $transient;
 		}
 
@@ -153,7 +154,6 @@ class ai_blog_post_generator {
 			&& version_compare( $remote->requires, get_bloginfo( 'version' ), '<=' )
 			&& version_compare( $remote->requires_php, PHP_VERSION, '<' )
 		) {
-			error_log('version check success');
 			$res = new stdClass();
 			$res->slug = $this->plugin_slug;
 			$res->plugin = plugin_basename( __FILE__ );
@@ -178,6 +178,132 @@ class ai_blog_post_generator {
 		}
 	}
 	
+	public function check_license() {
+		$remote_address = 'https://mediatech.group/wp-json/lmfwc/v2/licenses/validate/' . $this->license_key . '?consumer_key=ck_2f23c57a984551bba08e3b5d8f6e59b6b0cd5484&consumer_secret=cs_86b7379a65ccced73943315d16854f200376dc53';
+		
+		$remote = wp_remote_get(
+			$remote_address,
+			array(
+				'timeout' => 10,
+				'headers' => array(
+					'Accept' => 'application/json',
+					'Content-Type' => 'application/json; charset=UTF-8',
+				)
+			)
+		);
+		
+		if(
+			is_wp_error( $remote )
+			|| 200 !== wp_remote_retrieve_response_code( $remote )
+			|| empty( wp_remote_retrieve_body( $remote ) )
+		) {
+			$remote_error = json_decode( wp_remote_retrieve_body( $remote ) );
+			return $remote_error->message;
+		}
+		else {
+			$remote = json_decode( wp_remote_retrieve_body( $remote ) );
+			$timesActivated = $remote->data->timesActivated;
+			
+			if(isset($timesActivated) && $timesActivated >= 1) {
+				return 'active';
+			}
+			else {
+				return "Your license is not activated.";
+			}
+		}
+	}
+	
+	public function activate_license() {
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+			return 'active';
+		}
+		else {
+			$pattern = "/^MTG-[A-E1-5]{5}-[A-E1-5]{5}-AIBPG$/";
+			
+			if(preg_match($pattern, $this->license_key)) {
+				$remote_address = 'https://mediatech.group/wp-json/lmfwc/v2/licenses/activate/' . $this->license_key . '?consumer_key=ck_2f23c57a984551bba08e3b5d8f6e59b6b0cd5484&consumer_secret=cs_86b7379a65ccced73943315d16854f200376dc53';
+
+				$remote = wp_remote_get(
+					$remote_address,
+					array(
+						'timeout' => 10,
+						'headers' => array(
+							'Accept' => 'application/json',
+							'Content-Type' => 'application/json; charset=UTF-8',
+						)
+					)
+				);
+
+				if(
+					is_wp_error( $remote )
+					|| 200 !== wp_remote_retrieve_response_code( $remote )
+					|| empty( wp_remote_retrieve_body( $remote ) )
+				) {
+					$remote_error = json_decode( wp_remote_retrieve_body( $remote ) );
+					return $remote_error->message;
+				}
+				else {
+					$remote = json_decode( wp_remote_retrieve_body( $remote ) );
+					$timesActivated = $remote->data->timesActivated;
+					$timesActivatedMax = $remote->data->timesActivatedMax;
+					
+					if($timesActivated <= $timesActivatedMax) {
+						if (!empty($remote->data->createdAt) && !empty($remote->data->validFor)) {
+							$createdAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $remote->data->createdAt, new DateTimeZone('UTC'));
+							$validForDays = $remote->data->validFor;
+							
+							// Calculate the expiration date
+							$expiresAt = $createdAt->modify("+{$validForDays} days");
+							
+							// Compare the expiration date with the current date
+							$currentDate = new DateTimeImmutable();
+							if ($expiresAt > $currentDate) {
+								update_option('ai_blog_generator_license_isactive', 'active');
+								return 'active';
+							} else {
+								return "Your license appears to be expired.";
+							}
+						} else {
+							return "Your license appears to be expired.";
+						}
+					}
+					else {
+						return "Your license may may have reached the limit for the number of activations. Times Activated: " . $timesActivated . " | Max Activations: " . $timesActivatedMax;
+					}
+				}
+			}
+			else { return false; }
+		}
+	}
+	
+	public function deactivate_license() {
+		$remote_address = 'https://mediatech.group/wp-json/lmfwc/v2/licenses/deactivate/' . $this->license_key . '?consumer_key=ck_2f23c57a984551bba08e3b5d8f6e59b6b0cd5484&consumer_secret=cs_86b7379a65ccced73943315d16854f200376dc53';
+
+		$remote = wp_remote_get(
+			$remote_address,
+			array(
+				'timeout' => 10,
+				'headers' => array(
+					'Accept' => 'application/json',
+					'Content-Type' => 'application/json; charset=UTF-8',
+				)
+			)
+		);
+		
+		if(
+			is_wp_error( $remote )
+			|| 200 !== wp_remote_retrieve_response_code( $remote )
+			|| empty( wp_remote_retrieve_body( $remote ) )
+		) {
+			$remote_error = json_decode( wp_remote_retrieve_body( $remote ) );
+			return $remote_error->message;
+		}
+		else {
+			update_option('ai_blog_generator_license_isactive', '');
+			return 'deactive';
+		}
+	}
+	
 	public function enqueue_admin_scripts() {
 		wp_enqueue_script(
 			'blog-generator-admin-script',
@@ -194,7 +320,7 @@ class ai_blog_post_generator {
     }
 
     public function render_generator_page() {
-		error_log( 'Testing Log' );
+
 		if(isset($_GET['new_post']) && $_GET['new_post'] !== '') {
 			echo '<div class="notice notice-success is-dismissible">';
 			echo "<p>New post successfully created!</p>";
@@ -226,7 +352,7 @@ class ai_blog_post_generator {
 		
 		if(isset($_GET['error']) && $_GET['error'] !== '') {
 			echo '<div class="notice notice-error is-dismissible">';
-			echo "<p>There was an issue generating the blog post! Please contact support@mediatech.group and share this error message:</a></p>";
+			echo '<p>There was an issue generating the blog post! Please contact <a href="mailto:support@mediatech.group">support@mediatech.group</a> and share this error message:</p>';
 			echo "<p>" . $_GET['error'] . "</p>";
 			echo '</div>';
 		}
@@ -249,7 +375,14 @@ class ai_blog_post_generator {
                         <th scope="row"><label for="ai-seo-terms">SEO Terms</label></th>
                         <td>
 							<p style="font-style:italic;">Separate terms by comma (example: healthy dog food, puppy food, beagle): </p>
-							<input type="text" style="width:100%;" id="ai-seo-terms" name="ai_blog_generator_seo_terms">
+							<input type="text" style="width:100%;" id="ai-seo-terms" name="ai_blog_generator_seo_terms" />
+						</td>
+                    </tr>
+					<tr>
+                        <th scope="row"><label for="ai_default_post_length">Post Length</label></th>
+                        <td>
+							<input type="text" id="default_post_length" name="ai_default_post_length" value="<?php echo esc_attr($this->ai_default_post_length); ?>" />
+							<p style="font-style:italic;">(approximate number of words)</p>
 						</td>
                     </tr>
 					<tr>
@@ -276,6 +409,21 @@ class ai_blog_post_generator {
 									echo 'No categories found. Add your categories <a href="' . site_url( '/wp-admin/edit-tags.php?taxonomy=category' ) . '">here</a>.';
 								}
 							?>
+						</td>
+                    </tr>
+					<tr>
+					<tr>
+                        <th scope="row"><label for="ai_default_generate_excerpt">Generate Post Excerpt</label></th>
+                        <td>
+							<input type="checkbox" id="default_generate_excerpt" name="ai_default_generate_excerpt" value="yes" <?php if(esc_attr($this->ai_default_generate_excerpt) == "yes") { echo 'checked="checked>'; } ?> /> Yes
+							<p style="font-style:italic;">(this is a separate API call)</p>
+						</td>
+                    </tr>
+					<tr>
+                        <th scope="row"><label for="ai_default_generate_excerpt">Post Excerpt Length</label></th>
+                        <td>
+							<input type="text" id="default_excerpt_length" name="ai_default_excerpt_length" value="<?php if(isset($this->ai_default_excerpt_length) && esc_attr($this->ai_default_excerpt_length) !== '' ) { echo esc_attr($this->ai_default_excerpt_length); } else { echo '55'; } ?>" />
+							<p style="font-style:italic;">(recommended: 55 words)</p>
 						</td>
                     </tr>
 					<tr>
@@ -308,23 +456,28 @@ class ai_blog_post_generator {
             if (isset($_POST['ai_blog_generator_prompt']) && isset($_POST['ai_blog_generator_seo_terms'])) {
                 $prompt = sanitize_text_field($_POST['ai_blog_generator_prompt']);
                 $seo_terms = sanitize_text_field($_POST['ai_blog_generator_seo_terms']);
+				$post_length = sanitize_text_field($_POST['ai_default_post_length']);
 				$post_category = $_POST['ai_post_default_category'];
+				$generate_excerpt = $_POST['ai_default_generate_excerpt'];
+				$excerpt_length = $_POST['ai_default_generate_excerpt'];
 				$post_comment_status = $_POST['ai_post_default_comment_status'];
 
                 if (!empty($prompt)) {
-                    $this->generate_blog_post($prompt, $seo_terms, $post_category, $post_comment_status);
+                    $this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status);
                 }
             }
         }
         exit;
     }
 	
-	public function generate_blog_post($prompt, $seo_terms, $post_category, $post_comment_status) {
+	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status) {
 		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms;
 		
-		$default_post_length = $this->ai_default_post_length ?: '400';
+		if(!isset($post_length) || $post_length == '') {
+			$post_length = $this->ai_default_post_length ?: '400';
+		}
 		
-		$system_content = 'You are a blog post generation assistant who focuses on creating search engine optimized content for user-provided topics. Write complete posts using ' . $default_post_length . ' as the maximum number of words.';
+		$system_content = 'You are a blog post generation assistant who focuses on creating search engine optimized content for user-provided topics. Write complete posts using ' . $post_length . ' as the maximum number of words.';
 
         // Prepare the request data
         $data = array(
@@ -366,6 +519,8 @@ class ai_blog_post_generator {
 				
 				if (isset($result['choices'][0]['message']['content'])) {
 					$generated_content = $result['choices'][0]['message']['content'];
+					//Store original result so we can feed it back for generating the excerpt
+					$original_result = $generated_content;
 					
 					$prefix = "Title: ";
 					$start_index = strpos($generated_content, $prefix) + strlen($prefix);
@@ -381,15 +536,27 @@ class ai_blog_post_generator {
 					// Remove the title portion from the generated text
 					$generated_content = str_replace($generated_title, '', $generated_content);
 					
-					$generated_content = str_replace($prefix . $generated_title . "\n", '', $generated_content);
+					if (strpos($generated_content, $prefix) === 0) {
+						$generated_content = substr($generated_content, strlen($prefix));
+					}
+					
+					//$generated_content = str_replace($prefix . $generated_title . "\n", '', $generated_content);
 
 					// Trim the generated text again to remove any leading/trailing whitespaces or newline characters
 					$generated_content = trim($generated_content);
 					
-					 // Wrap section titles in <h3> tags
-					$generated_content = preg_replace('/\n([A-Za-z\s:]+)\n/', "\n<h3>$1</h3>\n", $generated_content);
+					// Replace \n with <p> tags
+					$generated_content = preg_replace('/(^|\n)(.*?)(\n|$)/s', '$1<p>$2</p>$3', $generated_content);
 
-					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status);
+					// Wrap section titles in <h3> tags
+					$generated_content = preg_replace('/<p>([A-Za-z\s:]+)<\/p>/', '<h3>$1</h3>', $generated_content);
+
+					$generated_excerpt = "";
+					if($generate_excerpt == 'yes') {
+						$generated_excerpt = $this->generate_post_excerpt($original_result, $excerpt_length);
+					}
+
+					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt);
 					$redirect_link = site_url( '/wp-admin/edit.php?page=ai-blog-generator&new_post=' . $new_post );
 				}
 				else {
@@ -418,8 +585,71 @@ class ai_blog_post_generator {
 			echo "Error: " . wp_remote_retrieve_response_code($response);
 		}
     }
+	
+	public function generate_post_excerpt($original_result, $excerpt_length) {
+		$prompt = "Write me a blog post excerpt (this should only be one paragraph with no title) that summarizes this blog post given its title and content that was already generated: " . $original_result;
+		
+		if(!isset($excerpt_length) || $excerpt_length == '') {
+			$excerpt_length = $this->ai_default_excerpt_length ?: '55';
+		}
+		
+		$system_content = 'You are a blog post generation assistant who focuses on creating search engine optimized content. Write a blog post excerpt using no more than' . $excerpt_length . ' as the maximum number of words.';
 
-    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status) {
+        // Prepare the request data
+        $data = array(
+			'messages' => array(
+				array(
+					'role' => 'system',
+					'content' => $system_content,
+				),
+				array(
+					'role' => 'user',
+					'content' => $prompt,
+				),
+			),
+			'model' => 'gpt-3.5-turbo',
+            'max_tokens' => 1000,
+			'temperature' => 0.7,
+        );
+
+        // Set up the HTTP request headers
+        $headers = array(
+            'Authorization' => 'Bearer ' . $this->openai_api_key,
+            'Content-Type' => 'application/json',
+        );
+
+        $url = 'https://api.openai.com/v1/chat/completions';
+		$args = array(
+			'body' => json_encode($data),
+			'headers' => $headers,
+			'method' => 'POST',
+			'timeout' => 30,
+		);
+
+		$response = wp_remote_request($url, $args);
+		
+		if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+			$body = wp_remote_retrieve_body($response);
+			if (!empty($body)) {
+				$result = json_decode($body, true);
+				
+				if (isset($result['choices'][0]['message']['content'])) {
+					return $result['choices'][0]['message']['content'];
+				}
+				else {
+					return "There was a problem generating the excerpt.";
+				}
+			}
+			else {
+				return "There was a problem generating the excerpt.";
+			}
+		}
+		else {
+			return "There was a problem generating the excerpt.";
+		}
+	}
+
+    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt) {
         $default_post_status = $this->ai_post_default_status ?: 'draft';
 		$default_post_category = $this->ai_post_default_status ?: '0';
 		$default_post_comment_status = $this->ai_post_default_comment_status ?: 'closed';
@@ -433,7 +663,7 @@ class ai_blog_post_generator {
             'post_status'    => $default_post_status,
             'post_author'    => get_current_user_id(),
             'post_type'      => 'post',
-			'post_excerpt'   => '',
+			'post_excerpt'   => $generated_excerpt,
 			'comment_status' => $post_comment_status,
 			'post_category'  => array( $post_category ),
 			'tags_input'     => $seo_terms,
@@ -445,6 +675,43 @@ class ai_blog_post_generator {
     }
 
     public function render_settings_page() {
+		if(isset($_GET['activate-license']) && $_GET['activate-license'] == true) {
+			$license_activation = $this->activate_license();
+			if($license_activation == "active") {
+				echo '<div class="notice notice-success is-dismissible">';
+				echo '<p>License successfully activated!</p>';
+				echo '</div>';
+			}
+			else {
+				echo '<div class="notice notice-error is-dismissible">';
+				echo '<p>There was an issue activating your license. Error code: ' . $license_activation . '</p>';
+				echo '<p>Please contact <a href="mailto:support@mediatech.group">support@mediatech.group</a>.</a></p>';
+				echo '</div>';
+			}
+		}
+		else {
+			if(isset($_GET['deactivate-license']) && $_GET['deactivate-license'] == true) {
+				$license_deactivation = $this->deactivate_license();
+				if($license_deactivation == "deactive") {
+					echo '<div class="notice notice-success is-dismissible">';
+					echo '<p>License successfully deactivated!</p>';
+					echo '</div>';
+				}
+				else {
+					echo '<div class="notice notice-error is-dismissible">';
+					echo '<p>There was an issue deactivating your license. Error code: ' . $license_deactivation . '</p>';
+					echo '<p>Please contact <a href="mailto:support@mediatech.group">support@mediatech.group</a>.</a></p>';
+					echo '</div>';
+				}
+			}
+			/* else {
+				if($this->license_isactive == 'active') {
+					if($this->check_license() == 'active') {
+						
+					}
+				}
+			} */
+		}
         ?>
         <div class="wrap">
             <div style="width:100%;display: flex;align-items: center;">
@@ -461,11 +728,15 @@ class ai_blog_post_generator {
     }
 
     public function register_settings() {
-        register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_api_key');
+        register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_license_key');
+		register_setting('ai_blog_generator_settings_hidden', 'ai_blog_generator_license_isactive');
+		register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_api_key');
 		register_setting('ai_blog_generator_settings_group', 'ai_default_post_length');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_status');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_category');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_comment_status');
+		register_setting('ai_blog_generator_settings_group', 'ai_default_generate_excerpt');
+		register_setting('ai_blog_generator_settings_group', 'ai_default_excerpt_length');
 		
 		add_settings_section(
 			'post_generator_main_section',
@@ -475,6 +746,14 @@ class ai_blog_post_generator {
 		);
 
 		// Add existing options fields
+		add_settings_field(
+			'License_key',
+			'License Key',
+			array($this, 'ai_blog_generator_license_key_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
 		add_settings_field(
 			'openai_api_key',
 			'OpenAI API Key',
@@ -508,8 +787,24 @@ class ai_blog_post_generator {
 		);
 		
 		add_settings_field(
+			'ai_default_generate_excerpt',
+			'Generate Excerpt by Default',
+			array($this, 'ai_default_generate_excerpt_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
+		add_settings_field(
+			'ai_default_excerpt_length',
+			'Default Post Excerpt Length',
+			array($this, 'ai_default_excerpt_length_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
+		add_settings_field(
 			'ai_post_default_comment_status',
-			'Default Post Status',
+			'Default Post Comment Status',
 			array($this, 'ai_post_default_comment_status_callback'),
 			'ai_blog_generator_settings_group',
 			'post_generator_main_section'
@@ -521,6 +816,22 @@ class ai_blog_post_generator {
 	}
 	
 	// Callback functions for the new fields
+	public function ai_blog_generator_license_key_callback() {
+		?>
+		<input type="text" id="ai_blog_generator_license_key" name="ai_blog_generator_license_key" value="<?php echo esc_attr($this->license_key); ?>" />
+		<?php
+		$license_isactive = get_option('ai_blog_generator_license_isactive');
+		if(isset($license_isactive) && $license_isactive == 'active')
+		{
+			echo '<span style="color:#007f00;">Valid License</span>';
+			echo ' | <a href="' . site_url( '/wp-admin/options-general.php?page=ai-blog-generator-settings&deactivate-license=true' ) . '">Deactivate</a>';
+		}
+		else {
+			echo '<a href="' . site_url( '/wp-admin/options-general.php?page=ai-blog-generator-settings&activate-license=true' ) . '">Activate License</a>';
+			echo '<p style="font-style:italic;">(this plugin is FREE, but there are lots of other amazing features in the premium version <a href="https://mediatech.group/product/ai-blog-post-generator-premium-licensing/" target="blank">here</a>)</p>';
+		}
+	}
+	
 	public function openai_api_key_callback() {
 		?>
 		<input type="text" id="ai-api-key" name="ai_blog_generator_api_key" value="<?php echo esc_attr($this->openai_api_key); ?>" />
@@ -567,6 +878,20 @@ class ai_blog_post_generator {
 		}
 	}
 	
+	public function ai_default_generate_excerpt_callback() {
+		?>
+		<input type="checkbox" id="default_generate_excerpt" name="ai_default_generate_excerpt" value="yes" <?php if(esc_attr($this->ai_default_generate_excerpt) == "yes") { echo 'checked="checked>'; } ?> /> Yes
+		<p style="font-style:italic;">(this is a separate API call)</p>
+		<?php
+	}
+	
+	public function ai_default_excerpt_length_callback() {
+		?>
+		<input type="text" id="default_excerpt_length" name="ai_default_excerpt_length" value="<?php if(isset($this->ai_default_excerpt_length) && esc_attr($this->ai_default_excerpt_length) !== '' ) { echo esc_attr($this->ai_default_excerpt_length); } else { echo '55'; } ?>" />
+		<p style="font-style:italic;">(recommended: 55 words)</p>
+		<?php
+	}
+	
 	public function ai_post_default_comment_status_callback() {
 		?>
 		<select id="ai_post_default_comment_status" name="ai_post_default_comment_status">
@@ -578,10 +903,13 @@ class ai_blog_post_generator {
 	}
 	
 	public function save_post_generator_plugin_options($input) {
+		update_option('ai_blog_generator_license_key', sanitize_text_field($input['ai_blog_generator_license_key']));
 		update_option('ai_blog_generator_api_key', sanitize_text_field($input['ai-api-key']));
 		update_option('ai_default_post_length', sanitize_text_field($input['default_post_length']));
 		update_option('ai_post_default_status', sanitize_text_field($input['ai_post_default_status']));
 		update_option('ai_post_default_category', sanitize_text_field($input['ai_post_default_category']));
+		update_option('ai_default_generate_excerpt', sanitize_text_field($input['ai_default_generate_excerpt']));
+		update_option('ai_default_excerpt_length', sanitize_text_field($input['ai_default_excerpt_length']));
 		update_option('ai_post_default_comment_status', sanitize_text_field($input['ai_post_default_comment_status']));
 	}
 }

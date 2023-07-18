@@ -4,7 +4,7 @@ Donate link: https://mediatechgroup.com
 Tags: ai, openai, blog post generation, blog post creation
 Requires at least: 6.0
 Tested up to: 6.2.2
-Stable tag: 1.2
+Stable tag: 1.7
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -15,78 +15,35 @@ This plugin allows you to generate a blog post based on a provided topic idea an
 
 This plugin allows you to generate a blog post based on a provided topic idea and SEO terms using AI.
 
-A few notes about the sections above:
-
-* "Contributors" is a comma separated list of wordpress.org usernames
-* "Tags" is a comma separated list of tags that apply to the plugin
-* "Requires at least" is the lowest version that the plugin will work on
-* "Tested up to" is the highest version that you've *successfully used to test the plugin*
-* Stable tag must indicate the Subversion "tag" of the latest stable version
-
-Note that the `readme.txt` value of stable tag is the one that is the defining one for the plugin.  If the `/trunk/readme.txt` file says that the stable tag is `4.3`, then it is `/tags/4.3/readme.txt` that'll be used for displaying information about the plugin.
-
-If you develop in trunk, you can update the trunk `readme.txt` to reflect changes in your in-development version, without having that information incorrectly disclosed about the current stable version that lacks those changes -- as long as the trunk's `readme.txt` points to the correct stable tag.
-
-If no stable tag is provided, your users may not get the correct version of your code.
-
 == Frequently Asked Questions ==
 
-= A question that someone might have =
+= Is there a premium version of this plugin? =
 
-An answer to that question.
+Yes! This plugin is in active development and updates are being released every couple of days. We have a detailed Development Roadmap [on our website] (https://mediatech.group/services/wordpress-development/wordpress-plugins/ai-blog-post-generator/) where you can get your license!
 
-= What about foo bar? =
+= Is there documentation for this plugin? =
 
-Answer to foo bar dilemma.
+Yes! Visit the plugin documentation [here] (https://mediatech.group/documentation/ai-blog-post-generator/).
 
 == Screenshots ==
 
-1. This screen shot description corresponds to screenshot-1.(png|jpg|jpeg|gif). Screenshots are stored in the /assets directory.
-2. This is the second screen shot
+1. Soon to be added.
 
 == Changelog ==
 
-= 1.0 =
-* A change since the previous version.
-* Another change.
+= 1.7 – July 18th, 2023 =
+* Initial public release!
+* License management for Premium version added.
+* Added excerpt generation capability.
+* Default options added for whether or not to generate the excerpt as well as length.
 
-= 0.5 =
-* List versions from most recent at top to oldest at bottom.
+= 1.3 – July 14th, 2023 =
+* Automatic plugin update from remote added.
+* Initital release.
 
 == Upgrade Notice ==
 
-= 1.0 =
-Upgrade notices describe the reason a user should upgrade.  No more than 300 characters.
+= 1.7 =
+Various bug fixes and feature additions.
 
-= 0.5 =
-This version fixes a security related bug.  Upgrade immediately.
-
-== A brief Markdown Example ==
-
-Markdown is what the parser uses to process much of the readme file.
-
-[markdown syntax]: https://daringfireball.net/projects/markdown/syntax
-
-Ordered list:
-
-1. Some feature
-1. Another feature
-1. Something else about the plugin
-
-Unordered list:
-
-* something
-* something else
-* third thing
-
-Links require brackets and parenthesis:
-
-Here's a link to [WordPress](https://wordpress.org/ "Your favorite software") and one to [Markdown's Syntax Documentation][markdown syntax]. Link titles are optional, naturally.
-
-Blockquotes are email style:
-
-> Asterisks for *emphasis*. Double it up  for **strong**.
-
-And Backticks for code:
-
-`<?php code(); ?>`
+Need support? Send us a message at <support@mediatech.group>.
