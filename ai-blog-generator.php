@@ -5,7 +5,7 @@
  * Description: Generate blog posts using artificial intelligence tools.
  * Author: Media & Technology Group, LLC
  * Author URI: https://mediatech.group
- * Version: 1.7
+ * Version: 1.8.1
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Update URI: 'https://mediatech.group/plugin-updates/ai-blog-post-generator/
  * Text Domain: ai-blog-post-generator
@@ -15,7 +15,7 @@
 defined( 'ABSPATH' ) || exit;
 
 class ai_blog_post_generator {
-    private $license_key;
+	private $license_key;
 	private $license_isactive;
 	private $openai_api_key;
 	private $ai_default_post_length;
@@ -24,6 +24,11 @@ class ai_blog_post_generator {
 	private $ai_post_default_comment_status;
 	private $ai_default_generate_excerpt;
 	private $ai_default_excerpt_length;
+	private $ai_post_default_language;
+	private $saved_prompts;
+	private $saved_terms;
+	private $schedule_frequency;
+	private $languages;
 	private $plugin_name;
 	private $version;
 	public $cache_key;
@@ -32,7 +37,7 @@ class ai_blog_post_generator {
 
     public function __construct() {
 		$this->plugin_name = 'AI Blog Post Generator';
-		$this->version = '1.7';
+		$this->version = '1.8.1';
 		$this->cache_key = 'ai_blog_post_gen_upd';
 		$this->cache_allowed = false;
 		$this->plugin_slug = plugin_basename( __DIR__ );
@@ -47,6 +52,45 @@ class ai_blog_post_generator {
 		$this->ai_post_default_comment_status = get_option('ai_post_default_comment_status');
 		$this->ai_default_generate_excerpt = get_option('ai_default_generate_excerpt');
 		$this->ai_default_excerpt_length = get_option('ai_default_excerpt_length');
+		$this->ai_post_default_language = get_option('ai_post_default_language');
+		
+		$this->languages = array(
+			'en' => 'English',
+			'es' => 'Spanish',
+			'fr' => 'French',
+			'de' => 'German',
+			'it' => 'Italian',
+			'pt' => 'Portuguese',
+			'ru' => 'Russian',
+			'ja' => 'Japanese',
+			'zh' => 'Chinese',
+			'ar' => 'Arabic',
+			// Add more languages as needed
+		);
+		
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+			$prompt_seo_terms = get_option('ai_blog_generator_prompt_seo_terms');
+			$this->saved_prompts = array();
+			$this->saved_terms = array();
+			
+			if (!empty($prompt_seo_terms) && is_array($prompt_seo_terms)) {
+				foreach ($prompt_seo_terms as $prompt_terms) {
+					if (isset($prompt_terms['prompt'])) {
+						$this->saved_prompts[] = $prompt_terms;
+					}
+					else if (isset($prompt_terms['term'])) {
+						$this->saved_terms[] = $prompt_terms;
+					}
+				}
+			}
+			
+			$this->schedule_frequency = get_option('ai_blog_generator_schedule_frequency');
+			
+			if (!empty($this->schedule_frequency)) {
+				add_action('init', array($this, 'schedule_post_generation'));
+				add_action('ai_blog_generator_generate_posts', array($this, 'generate_scheduled_post'));
+			}
+		}
 
         add_action('admin_menu', array($this, 'add_menu_link'));
         add_action('admin_post_generate_blog_post', array($this, 'handle_generator_form_submission'));
@@ -141,7 +185,6 @@ class ai_blog_post_generator {
 	}
 	
 	public function update( $transient ) {
-		error_log('update function');
 		if ( empty($transient->checked ) ) {
 			return $transient;
 		}
@@ -309,9 +352,15 @@ class ai_blog_post_generator {
 			'blog-generator-admin-script',
 			plugin_dir_url(__FILE__) . 'js/scripts.js',
 			array(),
-			'1.0',
+			'1.1',
 			true
 		);
+		
+		$localized_data = array(
+			'prompts' => $this->saved_prompts,
+			'terms' => $this->saved_terms,
+		);
+		wp_localize_script('blog-generator-admin-script', 'customData', $localized_data);
 	}
 
     public function add_menu_link() {
@@ -320,7 +369,6 @@ class ai_blog_post_generator {
     }
 
     public function render_generator_page() {
-
 		if(isset($_GET['new_post']) && $_GET['new_post'] !== '') {
 			echo '<div class="notice notice-success is-dismissible">';
 			echo "<p>New post successfully created!</p>";
@@ -362,6 +410,28 @@ class ai_blog_post_generator {
 				<div style="width:50%;flex-grow: 1;"><h1><?php echo $this->plugin_name; ?></h1></div>
 				<div style="width:50%;flex-grow: 1;"><p style="font-style:italic;text-align: right;">Version <?php echo $this->version; ?></p></div>
 			</div>
+			
+			<?php
+				// Display the existing prompt and terms pairs
+				if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+					if (!empty($this->saved_prompts)) {
+						echo '<select id="saved-prompts-select" name="saved_prompts">';
+						foreach ($this->saved_prompts as $index => $prompt) {
+							$term = isset($this->saved_terms[$index]) ? $this->saved_terms[$index] : ''; // Get the corresponding term
+
+							echo '<option value="' . esc_attr($index) . '">';
+							echo esc_html($prompt['prompt']);
+							echo '</option>';
+						}
+						echo '</select>';
+						echo '<button id="update-prompt-terms-btn">Update Prompt and Terms</button>';
+					}
+					else {
+						echo 'Save blog post topics and seo term pairs on the <a href="/wp-admin/options-general.php?page=ai-blog-generator-settings">Settings Page</a> for use in Automatic post creation or for choosing manually here.';
+					}
+				}
+			?>
+			
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php?action=generate_blog_post')); ?>">
                 <table class="form-table">
                     <tr>
@@ -381,7 +451,7 @@ class ai_blog_post_generator {
 					<tr>
                         <th scope="row"><label for="ai_default_post_length">Post Length</label></th>
                         <td>
-							<input type="text" id="default_post_length" name="ai_default_post_length" value="<?php echo esc_attr($this->ai_default_post_length); ?>" />
+							<input type="text" id="ai_default_post_length" name="ai_default_post_length" value="<?php echo esc_attr($this->ai_default_post_length); ?>" />
 							<p style="font-style:italic;">(approximate number of words)</p>
 						</td>
                     </tr>
@@ -415,14 +485,14 @@ class ai_blog_post_generator {
 					<tr>
                         <th scope="row"><label for="ai_default_generate_excerpt">Generate Post Excerpt</label></th>
                         <td>
-							<input type="checkbox" id="default_generate_excerpt" name="ai_default_generate_excerpt" value="yes" <?php if(esc_attr($this->ai_default_generate_excerpt) == "yes") { echo 'checked="checked>'; } ?> /> Yes
+							<input type="checkbox" id="ai_default_generate_excerpt" name="ai_default_generate_excerpt" value="yes" <?php if(esc_attr($this->ai_default_generate_excerpt) == "yes") { echo 'checked="checked>'; } ?> /> Yes
 							<p style="font-style:italic;">(this is a separate API call)</p>
 						</td>
                     </tr>
 					<tr>
-                        <th scope="row"><label for="ai_default_generate_excerpt">Post Excerpt Length</label></th>
+                        <th scope="row"><label for="ai_default_generate_excerpt_length">Post Excerpt Length</label></th>
                         <td>
-							<input type="text" id="default_excerpt_length" name="ai_default_excerpt_length" value="<?php if(isset($this->ai_default_excerpt_length) && esc_attr($this->ai_default_excerpt_length) !== '' ) { echo esc_attr($this->ai_default_excerpt_length); } else { echo '55'; } ?>" />
+							<input type="text" id="ai_default_generate_excerpt_length" name="ai_default_excerpt_length" value="<?php if(isset($this->ai_default_excerpt_length) && esc_attr($this->ai_default_excerpt_length) !== '' ) { echo esc_attr($this->ai_default_excerpt_length); } else { echo '55'; } ?>" />
 							<p style="font-style:italic;">(recommended: 55 words)</p>
 						</td>
                     </tr>
@@ -434,6 +504,21 @@ class ai_blog_post_generator {
 								<option value="open"<?php if($this->ai_post_default_comment_status == "open") { echo " selected='selected'"; } ?>>Allow Comments</option>
 								<option value="closed"<?php if($this->ai_post_default_comment_status == "closed") { echo " selected='selected'"; } ?>>Disallow Comments</option>
 							</select>
+						</td>
+                    </tr>
+					<tr>
+                        <th scope="row"><label for="ai_post_default_language">Post Language</label></th>
+                        <td>
+							<?php
+								echo '<select name="ai_post_default_language" id="ai_post_default_language">';
+			
+								foreach ($this->languages as $code => $name) {
+									$selected = ($this->ai_post_default_language === $code) ? 'selected' : '';
+									echo '<option value="' . $code . '" ' . $selected . '>' . $name . '</option>';
+								}
+
+								echo '</select>';
+							?>
 						</td>
                     </tr>
                 </table>
@@ -461,23 +546,28 @@ class ai_blog_post_generator {
 				$generate_excerpt = $_POST['ai_default_generate_excerpt'];
 				$excerpt_length = $_POST['ai_default_generate_excerpt'];
 				$post_comment_status = $_POST['ai_post_default_comment_status'];
+				$post_language = $_POST['ai_post_default_language'];
 
                 if (!empty($prompt)) {
-                    $this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status);
+                    $this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language);
                 }
             }
         }
         exit;
     }
 	
-	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status) {
-		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms;
+	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language) {
+		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms . ' Write s complete post using ' . $post_length . ' as the maximum number of words. Write the post in the ' . $this->languages[$language] . ' language.';
 		
 		if(!isset($post_length) || $post_length == '') {
 			$post_length = $this->ai_default_post_length ?: '400';
 		}
 		
-		$system_content = 'You are a blog post generation assistant who focuses on creating search engine optimized content for user-provided topics. Write complete posts using ' . $post_length . ' as the maximum number of words.';
+		if(!isset($language) || !array_key_exists($language, $this->languages)) {
+			$language = 'en';
+		}
+		
+		$system_content = 'You are a blog post generation assistant who focuses on creating search engine optimized content for user-provided topics.';
 
         // Prepare the request data
         $data = array(
@@ -553,7 +643,7 @@ class ai_blog_post_generator {
 
 					$generated_excerpt = "";
 					if($generate_excerpt == 'yes') {
-						$generated_excerpt = $this->generate_post_excerpt($original_result, $excerpt_length);
+						$generated_excerpt = $this->generate_post_excerpt($original_result, $excerpt_length, $language);
 					}
 
 					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt);
@@ -586,14 +676,18 @@ class ai_blog_post_generator {
 		}
     }
 	
-	public function generate_post_excerpt($original_result, $excerpt_length) {
-		$prompt = "Write me a blog post excerpt (this should only be one paragraph with no title) that summarizes this blog post given its title and content that was already generated: " . $original_result;
+	public function generate_post_excerpt($original_result, $excerpt_length, $language) {
+		$prompt = "Write me a blog post excerpt (this should only be one paragraph with no title) that summarizes this blog post given its title and content that was already generated: " . $original_result . 'Write the blog post excerpt using no more than' . $excerpt_length . ' as the maximum number of words. Write the post excerpt in the ' . $this->languages[$language] . ' language.';
 		
 		if(!isset($excerpt_length) || $excerpt_length == '') {
 			$excerpt_length = $this->ai_default_excerpt_length ?: '55';
 		}
 		
-		$system_content = 'You are a blog post generation assistant who focuses on creating search engine optimized content. Write a blog post excerpt using no more than' . $excerpt_length . ' as the maximum number of words.';
+		if(!isset($language) || !array_key_exists($language, $this->languages)) {
+			$language = 'en';
+		}
+		
+		$system_content = 'You are a blog post generation assistant who focuses on creating search engine optimized content.';
 
         // Prepare the request data
         $data = array(
@@ -737,6 +831,7 @@ class ai_blog_post_generator {
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_comment_status');
 		register_setting('ai_blog_generator_settings_group', 'ai_default_generate_excerpt');
 		register_setting('ai_blog_generator_settings_group', 'ai_default_excerpt_length');
+		register_setting('ai_blog_generator_settings_group', 'ai_post_default_language');
 		
 		add_settings_section(
 			'post_generator_main_section',
@@ -780,7 +875,7 @@ class ai_blog_post_generator {
 		
 		add_settings_field(
 			'ai_post_default_category',
-			'Default Post Status',
+			'Default Post Category',
 			array($this, 'ai_post_default_category_callback'),
 			'ai_blog_generator_settings_group',
 			'post_generator_main_section'
@@ -809,6 +904,35 @@ class ai_blog_post_generator {
 			'ai_blog_generator_settings_group',
 			'post_generator_main_section'
 		);
+		
+		add_settings_field(
+			'ai_post_default_language',
+			'Default Post Language',
+			array($this, 'ai_post_default_language_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+			register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_prompt_seo_terms');
+			register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_schedule_frequency');
+			
+			add_settings_field(
+				'ai_blog_generator_prompt_seo_terms',
+				'Topics and Terms',
+				array($this, 'ai_blog_generator_prompt_seo_terms_callback'),
+				'ai_blog_generator_settings_group',
+				'post_generator_main_section'
+			);
+
+			add_settings_field(
+				'ai_schedule_frequency',
+				'Schedule Frequency',
+				array($this, 'ai_schedule_frequency_callback'),
+				'ai_blog_generator_settings_group',
+				'post_generator_main_section'
+			);
+		}
     }
 	
 	public function post_generator_main_section_callback() {
@@ -902,6 +1026,73 @@ class ai_blog_post_generator {
 		<?php
 	}
 	
+	public function ai_post_default_language_callback() {
+		echo '<select name="ai_post_default_language" id="ai_post_default_language">';
+    
+		foreach ($this->languages as $code => $name) {
+			$selected = ($this->ai_post_default_language === $code) ? 'selected' : '';
+			echo '<option value="' . $code . '" ' . $selected . '>' . $name . '</option>';
+		}
+
+		echo '</select>';
+	}
+	
+	public function ai_blog_generator_prompt_seo_terms_callback() {
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+			?>
+			<table class="widefat striped" id="scheduled-post-topics-table">
+			<thead>
+				<tr>
+					<th style="padding-left:15px;">Blog Topics</th>
+					<th style="padding-left:15px;">SEO Terms</th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php
+					// Display the existing prompt and terms pairs
+
+					if (!empty($this->saved_prompts)) {
+						foreach ($this->saved_prompts as $index => $prompt) {
+							$term = isset($this->saved_terms[$index]) ? $this->saved_terms[$index] : ''; // Get the corresponding term
+
+							echo '<tr>';
+							// Display the textarea for prompt
+								echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" style="resize: none; width: 100%;">' . esc_textarea($prompt['prompt']) . '</textarea></td>';
+								// Display the textarea for terms
+								echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" style="resize: none; width: 100%;">' . esc_textarea($term['term']) . '</textarea></td>';
+							echo '</tr>';
+						}
+					}
+					else {
+						// Display the textarea for prompt
+						echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" style="resize: none; width: 100%;"></textarea></td>';
+
+						// Display the textarea for terms
+						echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" style="resize: none; width: 100%;"></textarea></td>';
+					}
+				?>
+			</tbody>
+		</table>
+		<input style="margin-top: 15px;" type="button" id="more_fields" onclick="add_fields();" value="Add More" class="btn btn-info" />
+		<?php
+		}
+	}
+	
+	public function ai_schedule_frequency_callback() {
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+		?>
+		<select id="ai-schedule-frequency" name="ai_blog_generator_schedule_frequency">
+			<option value="">-- Select Frequency --</option>
+			<option value="daily" <?php selected($this->schedule_frequency, 'daily'); ?>>Daily</option>
+			<option value="weekly-beginning" <?php selected($this->schedule_frequency, 'weekly-beginning'); ?>>Weekly (Beginning of Week)</option>
+			<option value="weekly-end" <?php selected($this->schedule_frequency, 'weekly-end'); ?>>Weekly (End of Week)</option>
+			<option value="biweekly" <?php selected($this->schedule_frequency, 'biweekly'); ?>>Biweekly</option>
+			<option value="monthly" <?php selected($this->schedule_frequency, 'monthly'); ?>>Monthly</option>
+		</select>
+		<?php
+		}
+	}
+	
 	public function save_post_generator_plugin_options($input) {
 		update_option('ai_blog_generator_license_key', sanitize_text_field($input['ai_blog_generator_license_key']));
 		update_option('ai_blog_generator_api_key', sanitize_text_field($input['ai-api-key']));
@@ -911,6 +1102,78 @@ class ai_blog_post_generator {
 		update_option('ai_default_generate_excerpt', sanitize_text_field($input['ai_default_generate_excerpt']));
 		update_option('ai_default_excerpt_length', sanitize_text_field($input['ai_default_excerpt_length']));
 		update_option('ai_post_default_comment_status', sanitize_text_field($input['ai_post_default_comment_status']));
+		update_option('ai_post_default_language', sanitize_text_field($input['ai_post_default_language']));
+		
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+			$submitted_data = $input['ai_blog_generator_prompt_seo_terms'];
+			$formatted_data = array('prompts' => array(), 'terms' => array());
+
+			foreach ($submitted_data as $entry) {
+				if(isset($entry['prompt']) && $entry['prompt'] !== "") {
+					$formatted_data['prompts'][] = sanitize_text_field($entry['prompt']);
+					$formatted_data['terms'][] = sanitize_text_field($entry['terms']);
+				}
+			}
+
+			update_option('ai_blog_generator_prompt_seo_terms', serialize($formatted_data));
+			update_option('ai_blog_generator_schedule_frequency', $input['ai-schedule-frequency']);
+		}
+	}
+	
+	public function schedule_post_generation() {
+		if(isset($license_isactive) && $this->license_isactive == 'active') {
+			$frequency = $this->schedule_frequency;
+			if ($frequency === 'daily') {
+				$time = strtotime('tomorrow');
+				wp_schedule_single_event($time, 'ai_blog_generator_generate_posts');
+			} elseif ($frequency === 'weekly-beginning') {
+				$time = strtotime('next week');
+				wp_schedule_single_event($time, 'ai_blog_generator_generate_posts');
+			} elseif ($frequency === 'weekly-end') {
+				$time = strtotime('next week +6 days');
+				wp_schedule_single_event($time, 'ai_blog_generator_generate_posts');
+			} elseif ($frequency === 'biweekly') {
+				$time = strtotime('+2 weeks');
+				wp_schedule_single_event($time, 'ai_blog_generator_generate_posts');
+			} elseif ($frequency === 'monthly') {
+				$time = strtotime('next month');
+				wp_schedule_single_event($time, 'ai_blog_generator_generate_posts');
+			}
+		}
+    }
+	
+	public function generate_scheduled_post() {	
+		if(isset($license_isactive) && $this->license_isactive == 'active') {
+			if (!empty($this->saved_prompts)) {
+				//We need pick one, maybe a setting is needed to determine how best to do this, but for now we will just take the first one that is available
+				$prompt = $this->saved_prompts[0];
+				$seo_terms = $this->saved_terms[0];
+				$post_length = $this->ai_default_post_length;
+				$post_category = $this->ai_post_default_category;
+				$generate_excerpt = $this->ai_default_generate_excerpt;
+				$excerpt_length = $this->ai_default_excerpt_length;
+				$post_comment_status = $this->ai_post_default_comment_status;
+				$post_language = $this->ai_post_default_language;
+
+				if (!empty($prompt)) {
+					$this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language);
+				}
+
+				// Update the stored prompts after generating posts
+				unset($prompt_seo_terms[$prompt]);
+				update_option('ai_blog_generator_prompt_seo_terms', $prompt_seo_terms);
+			}
+		}
+    }
+	
+	public function generate_seo_terms($blog_topic) {
+		/* 
+		//Make setting for default number of generated keywords/phrases
+		$prompt = "Give me a of SEO keywords and keyphrases (up to 5) for a blog post about " . $blog_topic . ". The list should be in a comma-separated format and not in a numbered list.";
+		
+		$system_content = 'You are a search engine optimization expert preparing keywords and keyphrases that will be implemented within a new blog post which is written in a following step.';
+
+        */
 	}
 }
 

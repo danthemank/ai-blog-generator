@@ -1,10 +1,10 @@
 === AI Blog Post Generator ===
 Contributors: mediatechgroup
-Donate link: https://mediatechgroup.com
+Donate link: https://mediatech.group/services/wordpress-development/wordpress-plugins/ai-blog-post-generator/
 Tags: ai, openai, blog post generation, blog post creation
 Requires at least: 6.0
 Tested up to: 6.2.2
-Stable tag: 1.7
+Stable tag: 1.8.1
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -30,6 +30,10 @@ Yes! Visit the plugin documentation [here] (https://mediatech.group/documentatio
 1. Soon to be added.
 
 == Changelog ==
+
+= 1.8.1 – July 19th, 2023 =
+* Default language selector setting added.
+* Scheduled automatic posts feature improved.
 
 = 1.7 – July 18th, 2023 =
 * Initial public release!
