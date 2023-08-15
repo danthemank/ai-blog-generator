@@ -5,7 +5,7 @@
  * Description: Generate blog posts using artificial intelligence tools.
  * Author: Media & Technology Group, LLC
  * Author URI: https://mediatech.group
- * Version: 1.8.1
+ * Version: 1.8.4
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Update URI: 'https://mediatech.group/plugin-updates/ai-blog-post-generator/
  * Text Domain: ai-blog-post-generator
@@ -25,6 +25,11 @@ class ai_blog_post_generator {
 	private $ai_default_generate_excerpt;
 	private $ai_default_excerpt_length;
 	private $ai_post_default_language;
+	
+	private $ai_post_default_featured_image;
+	private $unsplash_api_key;
+	private $unsplash_secret_key;
+	
 	private $saved_prompts;
 	private $saved_terms;
 	private $schedule_frequency;
@@ -37,7 +42,7 @@ class ai_blog_post_generator {
 
     public function __construct() {
 		$this->plugin_name = 'AI Blog Post Generator';
-		$this->version = '1.8.1';
+		$this->version = '1.8.4';
 		$this->cache_key = 'ai_blog_post_gen_upd';
 		$this->cache_allowed = false;
 		$this->plugin_slug = plugin_basename( __DIR__ );
@@ -53,6 +58,10 @@ class ai_blog_post_generator {
 		$this->ai_default_generate_excerpt = get_option('ai_default_generate_excerpt');
 		$this->ai_default_excerpt_length = get_option('ai_default_excerpt_length');
 		$this->ai_post_default_language = get_option('ai_post_default_language');
+		
+		$this->ai_post_default_featured_image = get_option('ai_post_default_featured_image');
+		$this->unsplash_api_key = get_option('ai_post_unsplash_api_key');
+		$this->unsplash_secret_key = get_option('ai_post_unsplash_secret_key');
 		
 		$this->languages = array(
 			'en' => 'English',
@@ -97,6 +106,7 @@ class ai_blog_post_generator {
         add_action('admin_init', array($this, 'register_settings'));
 		
 		add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+		add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_style'));
 		
 		add_filter( 'plugins_api', array( $this, 'info' ), 20, 3 );
 		add_filter( 'site_transient_update_plugins', array( $this, 'update' ) );
@@ -348,11 +358,19 @@ class ai_blog_post_generator {
 	}
 	
 	public function enqueue_admin_scripts() {
+		if(isset($this->unsplash_api_key) && !empty($this->unsplash_api_key)) {
+			wp_enqueue_script('unsplash-api', 'https://unpkg.com/unsplash-js@7.3.0/dist/unsplash.min.js');
+			wp_add_inline_script('unsplash-api', 'const unsplash = new UnsplashJS.default({ accessKey: "' $this->unsplash_api_key . '" });');
+		}
+		
+		// Enqueue media scripts
+		wp_enqueue_media();
+		
 		wp_enqueue_script(
 			'blog-generator-admin-script',
 			plugin_dir_url(__FILE__) . 'js/scripts.js',
-			array(),
-			'1.1',
+			array( 'jquery', 'media-editor' ),
+			'1.15',
 			true
 		);
 		
@@ -361,6 +379,11 @@ class ai_blog_post_generator {
 			'terms' => $this->saved_terms,
 		);
 		wp_localize_script('blog-generator-admin-script', 'customData', $localized_data);
+	}
+	
+	public function enqueue_admin_style() {
+		// Enqueue the admin style
+		wp_enqueue_style( 'blog-generator-admin-style', plugin_dir_url(__FILE__) . 'css/styles.css', array(), '1.2', 'all' );
 	}
 
     public function add_menu_link() {
@@ -765,6 +788,14 @@ class ai_blog_post_generator {
 
         $post_id = wp_insert_post($post_data);
 		wp_set_post_tags($post_id, $seo_terms, true);
+		
+		if (!empty($this->ai_post_default_featured_image)) {
+			// Attach the default featured image to the post
+			$image_id = attachment_url_to_postid($this->ai_post_default_featured_image);
+			if ($image_id) {
+				set_post_thumbnail($post_id, $image_id);
+			}
+		}
         return $post_id;
     }
 
@@ -832,6 +863,9 @@ class ai_blog_post_generator {
 		register_setting('ai_blog_generator_settings_group', 'ai_default_generate_excerpt');
 		register_setting('ai_blog_generator_settings_group', 'ai_default_excerpt_length');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_language');
+		register_setting('ai_blog_generator_settings_group', 'ai_post_default_featured_image');
+		register_setting('ai_blog_generator_settings_group', 'ai_post_unsplash_api_key');
+		register_setting('ai_blog_generator_settings_group', 'ai_post_unsplash_secret_key');
 		
 		add_settings_section(
 			'post_generator_main_section',
@@ -909,6 +943,30 @@ class ai_blog_post_generator {
 			'ai_post_default_language',
 			'Default Post Language',
 			array($this, 'ai_post_default_language_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
+		add_settings_field(
+			'ai_post_default_featured_image',
+			'Default Featured Image',
+			array($this, 'ai_post_default_featured_image_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
+		add_settings_field(
+			'ai_post_unsplash_api_key',
+			'Unsplash API Key',
+			array($this, 'ai_post_unsplash_api_key_callback'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+		
+		add_settings_field(
+			'ai_post_unsplash_secret_key',
+			'Unsplash Secret Key',
+			array($this, 'ai_post_unsplash_secret_key_callback'),
 			'ai_blog_generator_settings_group',
 			'post_generator_main_section'
 		);
@@ -1093,6 +1151,45 @@ class ai_blog_post_generator {
 		}
 	}
 	
+	public function ai_post_default_featured_image_callback() {
+		?>
+		<div id='default_image_table'>
+			<div>
+				<label for="ai_post_default_featured_image">
+				<?php _e('Default Featured Image', 'textdomain'); ?>
+				</label>
+				<br />
+				<input type="text" id="ai_post_default_featured_image" name="ai_post_default_featured_image" value="<?php echo esc_attr($this->ai_post_default_featured_image); ?>" size="50" />
+				<input type="button" class="button" id="upload_image_button" value="<?php _e('Upload Image', 'textdomain'); ?>" />
+				<?php
+					if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
+						echo '<input type="button" class="button" id="unsplash_search_button" value="' . _e('Search Unsplash', 'textdomain') . '" />';
+					}
+				?>
+				<p class="description">
+					<?php _e('Select or upload the default featured image for new posts.', 'textdomain'); ?>
+				</p>
+			</div>
+			<div>
+				<img id="default_image_preview" src="<?php echo $this->ai_post_default_featured_image; ?>" />
+			</div>
+		</div>
+		<?php
+	}
+	
+	public function ai_post_unsplash_api_key_callback() {
+		?>
+		<input type="text" id="ai_post_unsplash_api_key" name="ai_post_unsplash_api_key" value="<?php if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') { echo esc_attr($this->unsplash_api_key); } else { echo ''; } ?>" />
+		<p style="font-style:italic;">(you will need to create an account and keys at Unsplash)</p>
+		<?php
+	}
+	
+	public function ai_post_unsplash_secret_key_callback() {
+		?>
+		<input type="text" id="ai_post_unsplash_secret_key" name="ai_post_unsplash_secret_key" value="<?php if(isset($this->unsplash_secret_key) && esc_attr($this->unsplash_secret_key) !== '') { echo esc_attr($this->unsplash_secret_key); } else { echo ''; } ?>" />
+		<?php
+	}
+	
 	public function save_post_generator_plugin_options($input) {
 		update_option('ai_blog_generator_license_key', sanitize_text_field($input['ai_blog_generator_license_key']));
 		update_option('ai_blog_generator_api_key', sanitize_text_field($input['ai-api-key']));
@@ -1103,6 +1200,9 @@ class ai_blog_post_generator {
 		update_option('ai_default_excerpt_length', sanitize_text_field($input['ai_default_excerpt_length']));
 		update_option('ai_post_default_comment_status', sanitize_text_field($input['ai_post_default_comment_status']));
 		update_option('ai_post_default_language', sanitize_text_field($input['ai_post_default_language']));
+		update_option('ai_post_default_featured_image', sanitize_text_field($input['ai_post_default_featured_image']));
+		update_option('ai_post_unsplash_api_key', sanitize_text_field($input['ai_post_unsplash_api_key']));
+		update_option('ai_post_unsplash_secret_key', sanitize_text_field($input['ai_post_unsplash_secret_key']));
 		
 		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			$submitted_data = $input['ai_blog_generator_prompt_seo_terms'];

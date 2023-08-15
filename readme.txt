@@ -25,6 +25,10 @@ Yes! This plugin is in active development and updates are being released every c
 
 Yes! Visit the plugin documentation [here] (https://mediatech.group/documentation/ai-blog-post-generator/).
 
+= For a full list of Frequently Asked Questions =
+
+[Visit our website] (https://mediatech.group/services/wordpress-development/wordpress-plugins/ai-blog-post-generator/) for a full FAQ and if your question isn't listed, get in touch! We love answering questions.
+
 == Screenshots ==
 
 1. Soon to be added.

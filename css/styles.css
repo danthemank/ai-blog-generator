@@ -1,0 +1,15 @@
+/* Admin Styles */
+
+/* Settings Page */
+#default_image_table {
+	display: flex;
+    flex-direction: row;
+}
+
+#default_image_table div {
+	width: 50%;
+}
+
+#default_image_preview {
+	max-width: 300px;
+}
