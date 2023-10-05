@@ -360,7 +360,7 @@ class ai_blog_post_generator {
 	public function enqueue_admin_scripts() {
 		if(isset($this->unsplash_api_key) && !empty($this->unsplash_api_key)) {
 			wp_enqueue_script('unsplash-api', 'https://unpkg.com/unsplash-js@7.3.0/dist/unsplash.min.js');
-			wp_add_inline_script('unsplash-api', 'const unsplash = new UnsplashJS.default({ accessKey: "' $this->unsplash_api_key . '" });');
+			wp_add_inline_script('unsplash-api', 'const unsplash = new UnsplashJS.default({ accessKey: "'. $this->unsplash_api_key . '" });');
 		}
 		
 		// Enqueue media scripts
