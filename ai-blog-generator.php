@@ -233,7 +233,7 @@ class ai_blog_post_generator {
 	
 	public function check_license() {
 		$remote_address = 'https://mediatech.group/wp-json/lmfwc/v2/licenses/validate/' . $this->license_key . '?consumer_key=ck_2f23c57a984551bba08e3b5d8f6e59b6b0cd5484&consumer_secret=cs_86b7379a65ccced73943315d16854f200376dc53';
-		
+
 		$remote = wp_remote_get(
 			$remote_address,
 			array(
@@ -275,7 +275,6 @@ class ai_blog_post_generator {
 			
 			if(preg_match($pattern, $this->license_key)) {
 				$remote_address = 'https://mediatech.group/wp-json/lmfwc/v2/licenses/activate/' . $this->license_key . '?consumer_key=ck_2f23c57a984551bba08e3b5d8f6e59b6b0cd5484&consumer_secret=cs_86b7379a65ccced73943315d16854f200376dc53';
-
 				$remote = wp_remote_get(
 					$remote_address,
 					array(
@@ -286,7 +285,7 @@ class ai_blog_post_generator {
 						)
 					)
 				);
-
+		
 				if(
 					is_wp_error( $remote )
 					|| 200 !== wp_remote_retrieve_response_code( $remote )
@@ -801,7 +800,9 @@ class ai_blog_post_generator {
 
     public function render_settings_page() {
 		if(isset($_GET['activate-license']) && $_GET['activate-license'] == true) {
+			
 			$license_activation = $this->activate_license();
+	
 			if($license_activation == "active") {
 				echo '<div class="notice notice-success is-dismissible">';
 				echo '<p>License successfully activated!</p>';
@@ -999,18 +1000,31 @@ class ai_blog_post_generator {
 	
 	// Callback functions for the new fields
 	public function ai_blog_generator_license_key_callback() {
-		?>
-		<input type="text" id="ai_blog_generator_license_key" name="ai_blog_generator_license_key" value="<?php echo esc_attr($this->license_key); ?>" />
+
+		if ( empty( $this->license_key )) {
+					?>
+			<form method="post" action="<?php echo esc_url(admin_url('options-general.php?page=ai-blog-generator-settings&activate-license=true')); ?>" id="license-form">
+				<input type="text" id="ai_blog_generator_license_key" name="ai_blog_generator_license_key"  />
+				<?php 
+					echo '<input type="submit" name="activate_license" value="Activate License">';
+					echo '<p style="font-style:italic;">(this plugin is FREE, but there are lots of other amazing features in the premium version <a href="https://mediatech.group/product/ai-blog-post-generator-premium-licensing/" target="blank">here</a>)</p>';
+				?>
+			<form>
 		<?php
-		$license_isactive = get_option('ai_blog_generator_license_isactive');
-		if(isset($license_isactive) && $license_isactive == 'active')
-		{
-			echo '<span style="color:#007f00;">Valid License</span>';
-			echo ' | <a href="' . site_url( '/wp-admin/options-general.php?page=ai-blog-generator-settings&deactivate-license=true' ) . '">Deactivate</a>';
-		}
-		else {
-			echo '<a href="' . site_url( '/wp-admin/options-general.php?page=ai-blog-generator-settings&activate-license=true' ) . '">Activate License</a>';
-			echo '<p style="font-style:italic;">(this plugin is FREE, but there are lots of other amazing features in the premium version <a href="https://mediatech.group/product/ai-blog-post-generator-premium-licensing/" target="blank">here</a>)</p>';
+		} else {
+			?>
+			<input type="text" id="ai_blog_generator_license_key" name="ai_blog_generator_license_key" value="<?php echo esc_attr($this->license_key); ?>" />
+			<?php
+			$license_isactive = get_option('ai_blog_generator_license_isactive');
+			if(isset($license_isactive) && $license_isactive == 'active')
+			{
+				echo '<span style="color:#007f00;">Valid License</span>';
+				echo ' | <a href="' . esc_url(admin_url( 'options-general.php?page=ai-blog-generator-settings&deactivate-license=true' ) ). '">Deactivate</a>';
+			}
+			else {
+				echo '<a href="' . esc_url(admin_url( 'options-general.php?page=ai-blog-generator-settings&activate-license=true' )). '">Activate License</a>';
+				echo '<p style="font-style:italic;">(this plugin is FREE, but there are lots of other amazing features in the premium version <a href="https://mediatech.group/product/ai-blog-post-generator-premium-licensing/" target="blank">here</a>)</p>';
+			}
 		}
 	}
 	
