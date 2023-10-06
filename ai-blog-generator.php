@@ -1022,7 +1022,7 @@ class ai_blog_post_generator {
 				echo ' | <a href="' . esc_url(admin_url( 'options-general.php?page=ai-blog-generator-settings&deactivate-license=true' ) ). '">Deactivate</a>';
 			}
 			else {
-				echo '<a href="' . esc_url(admin_url( 'options-general.php?page=ai-blog-generator-settings&activate-license=true' )). '">Activate License</a>';
+				echo '<a href="' . esc_url(admin_url( 'options-general.php?page=ai-blog-generator-settings&activate-license=true' )). '">Now activates the license</a>';
 				echo '<p style="font-style:italic;">(this plugin is FREE, but there are lots of other amazing features in the premium version <a href="https://mediatech.group/product/ai-blog-post-generator-premium-licensing/" target="blank">here</a>)</p>';
 			}
 		}
