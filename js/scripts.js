@@ -8,8 +8,6 @@ document.addEventListener('DOMContentLoaded', function() {
 	var prompts = customData.prompts;
 	var terms = customData.terms;
 
-	console.log(prompts);
-
 	if(updateBtn) {
 		updateBtn.addEventListener('click', function() {
 		var selectedIndex = selectInput.value;

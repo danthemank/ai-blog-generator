@@ -112,6 +112,7 @@ class ai_blog_post_generator {
 		add_filter( 'site_transient_update_plugins', array( $this, 'update' ) );
 		add_action( 'upgrader_process_complete', array( $this, 'purge' ), 10, 2 );
     }
+
 	
 	public function request() {
 		$remote = get_transient( $this->cache_key );
@@ -1235,7 +1236,7 @@ class ai_blog_post_generator {
 	}
 	
 	public function schedule_post_generation() {
-		if(isset($license_isactive) && $this->license_isactive == 'active') {
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			$frequency = $this->schedule_frequency;
 			if ($frequency === 'daily') {
 				$time = strtotime('tomorrow');
@@ -1257,7 +1258,8 @@ class ai_blog_post_generator {
     }
 	
 	public function generate_scheduled_post() {	
-		if(isset($license_isactive) && $this->license_isactive == 'active') {
+		$prompt_seo_terms = [];
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			if (!empty($this->saved_prompts)) {
 				//We need pick one, maybe a setting is needed to determine how best to do this, but for now we will just take the first one that is available
 				$prompt = $this->saved_prompts[0];
