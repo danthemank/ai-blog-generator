@@ -13,7 +13,7 @@
  */
 
 defined( 'ABSPATH' ) || exit;
-
+require_once plugin_dir_path( __FILE__ ).'ajax/ajax.php';
 class ai_blog_post_generator {
 	private $license_key;
 	private $license_isactive;
@@ -976,7 +976,7 @@ class ai_blog_post_generator {
 		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_prompt_seo_terms');
 			register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_schedule_frequency');
-			
+
 			add_settings_field(
 				'ai_blog_generator_prompt_seo_terms',
 				'Topics and Terms',
@@ -1144,6 +1144,7 @@ class ai_blog_post_generator {
 						echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" style="resize: none; width: 100%;"></textarea></td>';
 					}
 				?>
+			<tr><td>These suggestions are possible by obtaining the blog topics.</td><td><button id="seo_button" class="seo_button" name="seo_button" type="button">Seo Suggestions</button></td></tr>
 			</tbody>
 		</table>
 		<input style="margin-top: 15px;" type="button" id="more_fields" onclick="add_fields();" value="Add More" class="btn btn-info" />
