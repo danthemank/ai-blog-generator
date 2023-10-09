@@ -7,9 +7,7 @@ function get_seo_terms() { ?>
         jQuery(document).ready(function () {
             jQuery("#seo_button").on("click", function () {
                 var promptValue = jQuery("textarea[name='ai_blog_generator_prompt_seo_terms[][prompt]']").val();
-                console.log(promptValue);
-        
-        
+    
                 jQuery.ajax({
                     type: "POST", 
                     url: ajaxurl, 
