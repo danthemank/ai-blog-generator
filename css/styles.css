@@ -13,3 +13,30 @@
 #default_image_preview {
 	max-width: 300px;
 }
+
+
+.tooltip {
+	position: relative;
+	display: inline-block;
+	cursor: pointer;
+}
+.tooltip-text {
+	visibility: hidden;
+	width: 200px;
+	background-color: #333;
+	color: #fff;
+	text-align: center;
+	border-radius: 5px;
+	padding: 10px;
+	position: absolute;
+	z-index: 1;
+	bottom: 125%;
+	left: 50%;
+	margin-left: -100px;
+	opacity: 0;
+	transition: opacity 0.3s;
+}
+.tooltip:hover .tooltip-text {
+	visibility: visible;
+	opacity: 1;
+}
