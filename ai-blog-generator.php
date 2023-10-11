@@ -1153,10 +1153,18 @@ class ai_blog_post_generator {
 							?>
 						</div>
 					</div>
+					<div class="tooltip">
+							<button id="store_button1" class="store_button1" name="store_button1" type="button">Suggest Based on Store</button>
+							<div class="tooltip-text">
+								<?php
+								echo "Generate a blog post topic + relevant SEO terms based on existing products in your woocommerce store.";
+								?>
+							</div>
+					</div>
 				</td>
 				<td>
 					<div class="tooltip">
-						<button id="seo_button1" class="seo_button1" name="seo_button1" type="button">SEO Suggestions</button>
+						<button id="seo_button1" class="seo_button1" name="seo_button1" type="button">Suggest SEO Terms Based on Current Post Title</button>
 						<div class="tooltip-text">
 							<?php
 							echo "Generate a list of SEO terms based on the Blog Post Topic.";
