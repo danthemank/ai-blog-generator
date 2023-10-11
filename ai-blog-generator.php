@@ -1130,23 +1130,23 @@ class ai_blog_post_generator {
 
 							echo '<tr>';
 							// Display the textarea for prompt
-								echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" style="resize: none; width: 100%;">' . esc_textarea($prompt['prompt']) . '</textarea></td>';
+								echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;">' . esc_textarea($prompt['prompt']) . '</textarea></td>';
 								// Display the textarea for terms
-								echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" style="resize: none; width: 100%;">' . esc_textarea($term['term']) . '</textarea></td>';
+								echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;">' . esc_textarea($term['term']) . '</textarea></td>';
 							echo '</tr>';
 						}
 					} else {
 						// Display the textarea for prompt
-						echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" style="resize: none; width: 100%;"></textarea></td>';
+						echo '<tr class="row"><td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;"></textarea></td>';
 
 						// Display the textarea for terms
-						echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" style="resize: none; width: 100%;"></textarea></td>';
+						echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;"></textarea></td></tr>';
 					}
 				?>
-			<tr>
+			<tr class ="rowButton">
 				<td>
 					<div class="tooltip">
-						<button id="blog_button" class="blog_button" name="blog_button" type="button">Suggest Based on Blog</button>
+						<button id="blog_button1" class="blog_button1" name="blog_button1" type="button">Suggest Based on Blog</button>
 						<div class="tooltip-text">
 							<?php
 							echo "Generate a blog post topic + relevant SEO terms based on existing posts within your website's blog.";
@@ -1156,7 +1156,7 @@ class ai_blog_post_generator {
 				</td>
 				<td>
 					<div class="tooltip">
-						<button id="seo_button" class="seo_button" name="seo_button" type="button">SEO Suggestions</button>
+						<button id="seo_button1" class="seo_button1" name="seo_button1" type="button">SEO Suggestions</button>
 						<div class="tooltip-text">
 							<?php
 							echo "Generate a list of SEO terms based on the Blog Post Topic.";
@@ -1167,7 +1167,7 @@ class ai_blog_post_generator {
 			</tr>
 			</tbody>
 		</table>
-		<input style="margin-top: 15px;" type="button" id="more_fields" onclick="add_fields();" value="Add More" class="btn btn-info" />
+		<input style="margin-top: 15px;" type="button" id="more_fields" value="Add More" class="btn btn-info" />
 		<?php
 		}
 	}
