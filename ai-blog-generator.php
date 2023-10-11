@@ -1166,6 +1166,14 @@ class ai_blog_post_generator {
 								</div>
 						</div>
 					<?php } ?>
+					<div class="tooltip">
+						<button id="page_button1" class="page_button1" name="page_button1" type="button">Suggest Based on Pages</button>
+						<div class="tooltip-text">
+							<?php
+							echo "Generate a blog post topic + relevant SEO terms based on existing pages in your website.";
+							?>
+						</div>
+					</div>
 				</td>
 				<td>
 					<div class="tooltip">
