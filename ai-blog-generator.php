@@ -1153,14 +1153,19 @@ class ai_blog_post_generator {
 							?>
 						</div>
 					</div>
-					<div class="tooltip">
-							<button id="store_button1" class="store_button1" name="store_button1" type="button">Suggest Based on Store</button>
-							<div class="tooltip-text">
-								<?php
-								echo "Generate a blog post topic + relevant SEO terms based on existing products in your woocommerce store.";
-								?>
-							</div>
-					</div>
+					<?php 
+					if (is_plugin_active('woocommerce/woocommerce.php')) {
+					
+					?>
+						<div class="tooltip">
+								<button id="store_button1" class="store_button1" name="store_button1" type="button">Suggest Based on Store</button>
+								<div class="tooltip-text">
+									<?php
+									echo "Generate a blog post topic + relevant SEO terms based on existing products in your woocommerce store.";
+									?>
+								</div>
+						</div>
+					<?php } ?>
 				</td>
 				<td>
 					<div class="tooltip">

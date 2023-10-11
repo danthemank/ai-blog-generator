@@ -265,6 +265,8 @@ function ai_blog_existent_generator()
 add_action('admin_footer', 'more_fields');
 
 function more_fields() {
+
+    $woocommerce_active = is_plugin_active('woocommerce/woocommerce.php');
 ?>
     <script>
         jQuery(document).ready(function() {
@@ -279,8 +281,10 @@ function more_fields() {
                 var newButton = table.insertRow(-1);
                 newButton.className = "rowButton";
                 newRow.innerHTML = '<td><textarea placeholder="New Blog Topic" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_' + (rowCount + 1) + '" style="resize: none; width: 100%;"></textarea></td><td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_' + (rowCount + 1) + '" style="resize: none; width: 100%;"></textarea></td>';
-                newButton.innerHTML = '<td><div class="tooltip"><button id="blog_button' + (rowCount + 1) + '" class="blog_button' + (rowCount + 1) + '" name="blog_button' + (rowCount + 1) + '" type="button">Suggest Based on Blog</button><div class="tooltip-text">' + blogTooltipText + '</div></div><div class="tooltip"><button id="store_button' + (rowCount + 1) + '" class="store_button' + (rowCount + 1) + '" name="store_button' + (rowCount + 1) + '" type="button">Suggest Based on Store</button><div class="tooltip-text">'+ storeTooltipText +'</div></div></td><td><div class="tooltip"><button id="seo_button' + (rowCount + 1) + '" class="seo_button' + (rowCount + 1) + '" name="seo_button' + (rowCount + 1) + '"  type="button">SEO Suggestions</button><div class="tooltip-text">' + seoTooltipText + '</div></div></td>';
-
+                newButton.innerHTML = '<td><div class="tooltip"><button id="blog_button' + (rowCount + 1) + '" class="blog_button' + (rowCount + 1) + '" name="blog_button' + (rowCount + 1) + '" type="button">Suggest Based on Blog</button><div class="tooltip-text">' + blogTooltipText + '</div></div><td><div class="tooltip"><button id="seo_button' + (rowCount + 1) + '" class="seo_button' + (rowCount + 1) + '" name="seo_button' + (rowCount + 1) + '"  type="button">Suggest SEO Terms Based on Current Post Title</button><div class="tooltip-text">' + seoTooltipText + '</div></div></td>';
+                if (<?php echo $woocommerce_active ? 'true' : 'false'; ?>) {
+                    newButton.innerHTML = '<td><div class="tooltip"><button id="blog_button' + (rowCount + 1) + '" class="blog_button' + (rowCount + 1) + '" name="blog_button' + (rowCount + 1) + '" type="button">Suggest Based on Blog</button><div class="tooltip-text">' + blogTooltipText + '</div></div><div class="tooltip"><button id="store_button' + (rowCount + 1) + '" class="store_button' + (rowCount + 1) + '" name="store_button' + (rowCount + 1) + '" type="button">Suggest Based on Store</button><div class="tooltip-text">'+ storeTooltipText +'</div></div></td><td><div class="tooltip"><button id="seo_button' + (rowCount + 1) + '" class="seo_button' + (rowCount + 1) + '" name="seo_button' + (rowCount + 1) + '"  type="button">Suggest SEO Terms Based on Current Post Title</button><div class="tooltip-text">' + seoTooltipText + '</div></div></td>';
+                }
 
                 jQuery("#scheduled-post-topics-table tbody tr.rowButton").each(function(index) {
                     if (index !== 0) {
