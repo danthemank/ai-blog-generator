@@ -544,6 +544,10 @@ class ai_blog_post_generator {
 							?>
 						</td>
                     </tr>
+					<tr>
+						<th><label for="ai_post_featured_image">Featured Image</label> </th>
+						<td><input type="radio" name="royalty" id="royalty">Royalty Free from Unsplash <br><input type="radio" name="dall-e" id="dall-e">Generate with DALL-E 2</td>
+					</tr>
                 </table>
                 <?php wp_nonce_field('generate_blog_post', 'generate_blog_post_nonce'); ?>
                 <?php
@@ -1337,3 +1341,12 @@ class ai_blog_post_generator {
 
 // Initialize the plugin
 $ai_blog_post_generator = new ai_blog_post_generator();
+
+
+$unsplash_api_key = get_option('ai_post_unsplash_api_key');
+?>
+
+<script>
+    // Define una variable JavaScript con la clave de la API
+    var unsplashApiKey = "<?php echo $unsplash_api_key; ?>";
+</script>

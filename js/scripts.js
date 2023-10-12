@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 	
 	function searchUnsplash(query) {
-		var unsplash = new UnsplashJS.default({ accessKey: 'F2iC2LdG6p9cUhPr6yUhTStaVEKw8KlokDtQBWPsKA0' }); // Replace 'YOUR_UNSPLASH_API_KEY' with your actual API key
+		var unsplash = new UnsplashJS.default({ accessKey: unsplashApiKey }); 
 		unsplash.search.photos(query, 1, 10, { orientation: 'landscape' }).then(function (result) {
 			var imageUrls = result.response.results.map(function (photo) {
 			return photo.urls.regular;
