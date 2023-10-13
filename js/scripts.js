@@ -29,37 +29,40 @@ document.addEventListener('DOMContentLoaded', function() {
 		defaultImageField.value = url;
 		defaultImagePreview.src = url;
 	}
-	
+
 	function searchUnsplash(query) {
-		var unsplash = new UnsplashJS.default({ accessKey: unsplashApiKey }); 
-		unsplash.search.photos(query, 1, 10, { orientation: 'landscape' }).then(function (result) {
-			var imageUrls = result.response.results.map(function (photo) {
-			return photo.urls.regular;
-		});
+		var searchTerm = query;
+		var apiKey = unsplashApiKey; 
 
-		// Update the image URLs in the media library
-		if (imageUrls.length > 0) {
-			unsplashMediaLibrary = wp.media({
-			title: 'Unsplash Images',
-			library: {
-			type: 'image',
+		jQuery.ajax({
+			url: 'https://api.unsplash.com/search/photos',
+			method: 'GET',
+			headers: {
+				'Authorization': 'Client-ID ' + apiKey
 			},
-			multiple: false,
-			});
+			data: {
+				query: searchTerm
+			},
+			success: function(data) {
+				var imageResults = jQuery('#image-results');
+				imageResults.empty();
 
-			unsplashMediaLibrary.on('select', function () {
-				var attachment = unsplashMediaLibrary.state().get('selection').first().toJSON();
-				updateImage(attachment.url);
-			});
+				data.results.forEach(function(photo) {
+					var imageElement = '<img src="' + photo.urls.thumb + '" alt="' + photo.alt_description + '" data-url="' + photo.urls.regular + '" class="thumbnail-image">';
+					imageResults.append(imageElement);
+				});
 
-			imageUrls.forEach(function (url) {
-				unsplashMediaLibrary.state().get('library').add(wp.media.attachment(url));
-			});
-
-			unsplashMediaLibrary.open();
-		}
+				imageResults.find('img').on('click', function() {
+                    var imageUrl = jQuery(this).data('url');
+                    jQuery('#ai_post_default_featured_image').val(imageUrl);
+                });
+			},
+			error: function() {
+				alert('Error al buscar imágenes en Unsplash.');
+			}
 		});
 	}
+	
 
 	defaultImageField.addEventListener('change', function() {
 		var imageUrl = defaultImageField.value;
@@ -93,4 +96,16 @@ document.addEventListener('DOMContentLoaded', function() {
 			searchUnsplash(query);
 		}
 		});
+});
+
+jQuery(document).ready(function() {
+	jQuery('#royalty').change(function() {
+		if (jQuery(this).is(':checked')) {
+            jQuery('.default_image').css('display', 'table-cell');
+            jQuery('.result_image').css('display', 'table-cell');
+        } else {
+            jQuery('.default_image').css('display', 'none');
+            jQuery('.result_image').css('display', 'none');
+        }
+	});
 });

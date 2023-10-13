@@ -360,7 +360,6 @@ class ai_blog_post_generator {
 	public function enqueue_admin_scripts() {
 		if(isset($this->unsplash_api_key) && !empty($this->unsplash_api_key)) {
 			wp_enqueue_script('unsplash-api', 'https://unpkg.com/unsplash-js@7.3.0/dist/unsplash.min.js');
-			wp_add_inline_script('unsplash-api', 'const unsplash = new UnsplashJS.default({ accessKey: "'. $this->unsplash_api_key . '" });');
 		}
 		
 		// Enqueue media scripts
@@ -548,6 +547,11 @@ class ai_blog_post_generator {
 						<th><label for="ai_post_featured_image">Featured Image</label> </th>
 						<td><input type="radio" name="royalty" id="royalty">Royalty Free from Unsplash <br><input type="radio" name="dall-e" id="dall-e">Generate with DALL-E 2</td>
 					</tr>
+					<tr>
+						<td></td>
+						<td class="default_image" style="display: none;"><?php echo $this->ai_post_default_featured_image_callback(); ?>
+						<div class="result_image" style="display: none;"><?php echo $this->ai_post_unsplash_images(); ?></div></td>
+					</tr>
                 </table>
                 <?php wp_nonce_field('generate_blog_post', 'generate_blog_post_nonce'); ?>
                 <?php
@@ -584,6 +588,7 @@ class ai_blog_post_generator {
     }
 	
 	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language) {
+
 		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms . ' Write s complete post using ' . $post_length . ' as the maximum number of words. Write the post in the ' . $this->languages[$language] . ' language.';
 		
 		if(!isset($post_length) || $post_length == '') {
@@ -624,7 +629,7 @@ class ai_blog_post_generator {
 			'body' => json_encode($data),
 			'headers' => $headers,
 			'method' => 'POST',
-			'timeout' => 30,
+			'timeout' => 90,
 		);
 
 		$response = wp_remote_request($url, $args);
@@ -871,6 +876,7 @@ class ai_blog_post_generator {
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_language');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_featured_image');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_unsplash_api_key');
+		register_setting('ai_blog_generator_settings_group', 'ai_post_unsplash_images');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_unsplash_secret_key');
 		
 		add_settings_section(
@@ -961,6 +967,14 @@ class ai_blog_post_generator {
 			'post_generator_main_section'
 		);
 		
+		add_settings_field(
+			'ai_post_unsplash_images',
+			'',
+			array($this, 'ai_post_unsplash_images'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+
 		add_settings_field(
 			'ai_post_unsplash_api_key',
 			'Unsplash API Key',
@@ -1224,13 +1238,15 @@ class ai_blog_post_generator {
 				<input type="button" class="button" id="upload_image_button" value="<?php _e('Upload Image', 'textdomain'); ?>" />
 				<?php
 					if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
-						echo '<input type="button" class="button" id="unsplash_search_button" value="' . _e('Search Unsplash', 'textdomain') . '" />';
+						?>
+						<input type="button" class="button" id="unsplash_search_button" value="<?php _e('Search Unsplash', 'textdomain'); ?>" />
+						<?php
 					}
 				?>
 				<p class="description">
 					<?php _e('Select or upload the default featured image for new posts.', 'textdomain'); ?>
 				</p>
-			</div>
+			</div>		
 			<div>
 				<img id="default_image_preview" src="<?php echo $this->ai_post_default_featured_image; ?>" />
 			</div>
@@ -1238,6 +1254,12 @@ class ai_blog_post_generator {
 		<?php
 	}
 	
+	public function ai_post_unsplash_images() {
+		?>
+		<div id="image-results" class="image-results"></div>
+		<?php
+	}
+
 	public function ai_post_unsplash_api_key_callback() {
 		?>
 		<input type="text" id="ai_post_unsplash_api_key" name="ai_post_unsplash_api_key" value="<?php if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') { echo esc_attr($this->unsplash_api_key); } else { echo ''; } ?>" />
