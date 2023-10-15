@@ -568,6 +568,7 @@ class ai_blog_post_generator {
     }
 
     public function handle_generator_form_submission() {
+		$post_image = '';
         if (isset($_POST['generate_blog_post_nonce']) && wp_verify_nonce($_POST['generate_blog_post_nonce'], 'generate_blog_post')) {
             if (isset($_POST['ai_blog_generator_prompt']) && isset($_POST['ai_blog_generator_seo_terms'])) {
                 $prompt = sanitize_text_field($_POST['ai_blog_generator_prompt']);
@@ -578,16 +579,18 @@ class ai_blog_post_generator {
 				$excerpt_length = $_POST['ai_default_generate_excerpt'];
 				$post_comment_status = $_POST['ai_post_default_comment_status'];
 				$post_language = $_POST['ai_post_default_language'];
-
+				if(!empty($_POST['ai_post_default_featured_image'])) {
+					$post_image = $_POST['ai_post_default_featured_image'];
+				}
                 if (!empty($prompt)) {
-                    $this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language);
+                    $this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language, $post_image);
                 }
             }
         }
         exit;
     }
-	
-	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language) {
+
+	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language, $post_image = null) {
 
 		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms . ' Write s complete post using ' . $post_length . ' as the maximum number of words. Write the post in the ' . $this->languages[$language] . ' language.';
 		
@@ -678,7 +681,7 @@ class ai_blog_post_generator {
 						$generated_excerpt = $this->generate_post_excerpt($original_result, $excerpt_length, $language);
 					}
 
-					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt);
+					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt, $post_image);
 					$redirect_link = site_url( '/wp-admin/edit.php?page=ai-blog-generator&new_post=' . $new_post );
 				}
 				else {
@@ -775,13 +778,35 @@ class ai_blog_post_generator {
 		}
 	}
 
-    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt) {
+    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt, $post_image = null) {
         $default_post_status = $this->ai_post_default_status ?: 'draft';
 		$default_post_category = $this->ai_post_default_status ?: '0';
 		$default_post_comment_status = $this->ai_post_default_comment_status ?: 'closed';
 		if(!isset($post_category) || $post_category == '') { $post_category = $default_post_category; }
 		if(!isset($post_comment_status) || $post_comment_status == '') { $post_comment_status = $default_post_comment_status; }
 		
+		$image_url = $post_image;
+		$image = file_get_contents($image_url);
+		$parsed_url = parse_url($image_url);
+		$path = $parsed_url['path'];
+		$path_parts = explode('/', $path);
+		$filename = end($path_parts);
+
+		$upload_dir = wp_upload_dir();
+		$image_data = file_put_contents($upload_dir['path'] . '/' . $filename.'.jpg', $image);
+		if ($image_data) {
+			$file = $upload_dir['path'] . '/' . $filename.'.jpg';
+			$file_type = wp_check_filetype('nombre_de_archivo.jpg', null);
+			$attachment = array(
+				'post_mime_type' => $file_type['type'],
+				'post_title'     => $filename.'.jpg',
+				'post_status'    => 'inherit'
+			);
+			$attachment_id = wp_insert_attachment($attachment, $file);
+
+			wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $file));
+		}
+
 		// Create new post
         $post_data = array(
             'post_title'     => $post_title,
@@ -793,11 +818,14 @@ class ai_blog_post_generator {
 			'comment_status' => $post_comment_status,
 			'post_category'  => array( $post_category ),
 			'tags_input'     => $seo_terms,
+			'post_thumbnail' => $attachment_id
         );
 
         $post_id = wp_insert_post($post_data);
 		wp_set_post_tags($post_id, $seo_terms, true);
-		
+
+		set_post_thumbnail($post_id, $attachment_id);
+
 		if (!empty($this->ai_post_default_featured_image)) {
 			// Attach the default featured image to the post
 			$image_id = attachment_url_to_postid($this->ai_post_default_featured_image);
