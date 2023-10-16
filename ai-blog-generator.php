@@ -552,6 +552,11 @@ class ai_blog_post_generator {
 						<td class="default_image" style="display: none;"><?php echo $this->ai_post_default_featured_image_callback(); ?>
 						<div class="result_image" style="display: none;"><?php echo $this->ai_post_unsplash_images(); ?></div></td>
 					</tr>
+					<tr>
+						<td></td>
+						<td class="dalle_image" style="display: none;"><?php echo $this->ai_post_dalle2_image_callback(); ?>
+						<div class="dalle_result" style="display: none;"><?php echo $this->ai_post_dalle_images(); ?></div></td>
+					</tr>
                 </table>
                 <?php wp_nonce_field('generate_blog_post', 'generate_blog_post_nonce'); ?>
                 <?php
@@ -581,6 +586,9 @@ class ai_blog_post_generator {
 				$post_language = $_POST['ai_post_default_language'];
 				if(!empty($_POST['ai_post_default_featured_image'])) {
 					$post_image = $_POST['ai_post_default_featured_image'];
+				}
+				if(!empty($_POST['ai_post_dalle2_image'])) {
+					$post_image = $_POST['ai_post_dalle2_image'];
 				}
                 if (!empty($prompt)) {
                     $this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language, $post_image);
@@ -680,7 +688,6 @@ class ai_blog_post_generator {
 					if($generate_excerpt == 'yes') {
 						$generated_excerpt = $this->generate_post_excerpt($original_result, $excerpt_length, $language);
 					}
-
 					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt, $post_image);
 					$redirect_link = site_url( '/wp-admin/edit.php?page=ai-blog-generator&new_post=' . $new_post );
 				}
@@ -1288,6 +1295,36 @@ class ai_blog_post_generator {
 		<?php
 	}
 
+	public function ai_post_dalle2_image_callback() {
+		?>
+		<div id='dalle_table'>
+			<div>
+				<label for="ai_post_dalle2_image">
+				<?php _e('Image Url', 'textdomain'); ?>
+				</label>
+				<br />
+				<input type="text" id="ai_post_dalle2_image" name="ai_post_dalle2_image" style="width: 25%;"/>
+				<?php
+					if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
+						?>
+						<input type="button" class="button" id="dalle_search_button" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
+						<?php
+					}
+				?>
+				<p class="description">
+					<?php _e('Type what you want to generate with DALL-E 2.', 'textdomain'); ?>
+				</p>
+			</div>
+		</div>
+		<?php
+	}
+
+	public function ai_post_dalle_images() {
+		?>
+		<div id="dalle_image_results" class="dalle_image_results"></div>
+		<?php
+	}
+
 	public function ai_post_unsplash_api_key_callback() {
 		?>
 		<input type="text" id="ai_post_unsplash_api_key" name="ai_post_unsplash_api_key" value="<?php if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') { echo esc_attr($this->unsplash_api_key); } else { echo ''; } ?>" />
@@ -1377,15 +1414,9 @@ class ai_blog_post_generator {
 			}
 		}
     }
-	
-	public function generate_seo_terms($blog_topic) {
-		/* 
-		//Make setting for default number of generated keywords/phrases
-		$prompt = "Give me a of SEO keywords and keyphrases (up to 5) for a blog post about " . $blog_topic . ". The list should be in a comma-separated format and not in a numbered list.";
-		
-		$system_content = 'You are a search engine optimization expert preparing keywords and keyphrases that will be implemented within a new blog post which is written in a following step.';
 
-        */
+	public function generate_image_dalle($description) {
+
 	}
 }
 
@@ -1394,9 +1425,12 @@ $ai_blog_post_generator = new ai_blog_post_generator();
 
 
 $unsplash_api_key = get_option('ai_post_unsplash_api_key');
+$open_api_key = get_option('ai_blog_generator_api_key');
 ?>
 
 <script>
     // Define una variable JavaScript con la clave de la API
     var unsplashApiKey = "<?php echo $unsplash_api_key; ?>";
+    var openApiKey = "<?php echo $open_api_key; ?>";
 </script>
+

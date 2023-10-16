@@ -46,6 +46,11 @@
 	max-height: 60%;
 }
 
+.dalle_image_results {
+	max-width: 80%;
+	max-height: 60%;
+}
+
 .thumbnail-image {
     width: 200px;
     height: 180px;

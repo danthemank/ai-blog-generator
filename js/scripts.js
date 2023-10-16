@@ -1,7 +1,3 @@
-/* function add_fields() {
-	document.getElementById("scheduled-post-topics-table").insertRow(-1).innerHTML = '<tr><td><textarea placeholder="New Blog Topic" th:field="${topicTermsSet.topic}" name="ai_blog_generator_prompt_seo_terms[][prompt]" style="resize: none; width: 100%;"></textarea></td><td><textarea placeholder="SEO Terms" th:field="${topicTermsSet.terms}" name="ai_blog_generator_prompt_seo_terms[][term]" style="resize: none; width: 100%;"></textarea></td></tr>';
-} */
-
 document.addEventListener('DOMContentLoaded', function() {
 	var updateBtn = document.getElementById('update-prompt-terms-btn');
 	var selectInput = document.getElementById('saved-prompts-select');
@@ -23,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	var defaultImagePreview = document.querySelector('#default_image_preview');
 	var uploadButton = document.querySelector('#upload_image_button');
 	var unsplashSearchButton = document.querySelector('#unsplash_search_button');
+	var dalleSearchButton = document.querySelector('#dalle_search_button');
 
 	// Function to update the image URL and preview
 	function updateImage(url) {
@@ -58,11 +55,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 			},
 			error: function() {
-				alert('Error al buscar imágenes en Unsplash.');
+				alert('Error when searching for images on Unsplash.');
 			}
 		});
 	}
 	
+
+	function generateDalle(query) {
+		var searchTerm = query;
+		var data = {
+			prompt: searchTerm,
+			n: 10,
+			size: '512x512'
+		};
+		var headers = {
+			"Authorization": "Bearer "+openApiKey,
+			"Content-Type": "application/json"
+		};
+		jQuery.ajax({
+			url: 'https://api.openai.com/v1/images/generations',
+			type: 'POST',
+			headers: headers,
+			data: JSON.stringify(data),
+			success: function(data) {
+				var imageResults = jQuery('#dalle_image_results');
+				imageResults.empty();
+				data.data.forEach(function(item) {
+					var imageElement = '<img src="'+item.url+'" data-url="' + item.url + '" class="thumbnail-image">';
+					imageResults.append(imageElement);
+				});
+
+				imageResults.find('img').on('click', function() {
+                    var imageUrl = jQuery(this).data('url');
+                    jQuery('#ai_post_dalle2_image').val(imageUrl);
+                });
+			},
+			error: function() {
+				alert('Error when generating images in DALL-E 2.');
+			}
+		});
+	}
+
 
 	defaultImageField.addEventListener('change', function() {
 		var imageUrl = defaultImageField.value;
@@ -96,6 +129,13 @@ document.addEventListener('DOMContentLoaded', function() {
 			searchUnsplash(query);
 		}
 		});
+
+	dalleSearchButton.addEventListener('click', function () {
+		var query = prompt('Enter your generation term for DALL-E 2 images:');
+		if (query && query.trim() !== '') {
+			generateDalle(query);
+		}
+		});
 });
 
 jQuery(document).ready(function() {
@@ -106,6 +146,15 @@ jQuery(document).ready(function() {
         } else {
             jQuery('.default_image').css('display', 'none');
             jQuery('.result_image').css('display', 'none');
+        }
+	});
+	jQuery('#dall-e').change(function() {
+		if (jQuery(this).is(':checked')) {
+            jQuery('.dalle_image').css('display', 'table-cell');
+            jQuery('.dalle_result').css('display', 'table-cell');
+        } else {
+            jQuery('.dalle_image').css('display', 'none');
+            jQuery('.dalle_result').css('display', 'none');
         }
 	});
 });
