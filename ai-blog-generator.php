@@ -672,8 +672,6 @@ class ai_blog_post_generator {
 					if (strpos($generated_content, $prefix) === 0) {
 						$generated_content = substr($generated_content, strlen($prefix));
 					}
-					
-					//$generated_content = str_replace($prefix . $generated_title . "\n", '', $generated_content);
 
 					// Trim the generated text again to remove any leading/trailing whitespaces or newline characters
 					$generated_content = trim($generated_content);
@@ -875,13 +873,6 @@ class ai_blog_post_generator {
 					echo '</div>';
 				}
 			}
-			/* else {
-				if($this->license_isactive == 'active') {
-					if($this->check_license() == 'active') {
-						
-					}
-				}
-			} */
 		}
         ?>
         <div class="wrap">
@@ -1429,7 +1420,7 @@ $open_api_key = get_option('ai_blog_generator_api_key');
 ?>
 
 <script>
-    // Define una variable JavaScript con la clave de la API
+    // Defines a JavaScript variable with the API key
     var unsplashApiKey = "<?php echo $unsplash_api_key; ?>";
     var openApiKey = "<?php echo $open_api_key; ?>";
 </script>
