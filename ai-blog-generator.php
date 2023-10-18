@@ -58,6 +58,7 @@ class ai_blog_post_generator {
 		$this->ai_default_generate_excerpt = get_option('ai_default_generate_excerpt');
 		$this->ai_default_excerpt_length = get_option('ai_default_excerpt_length');
 		$this->ai_post_default_language = get_option('ai_post_default_language');
+		
 		$this->ai_post_default_featured_image = get_option('ai_post_default_featured_image');
 		$this->unsplash_api_key = get_option('ai_post_unsplash_api_key');
 		$this->unsplash_secret_key = get_option('ai_post_unsplash_secret_key');
@@ -578,6 +579,7 @@ class ai_blog_post_generator {
     }
 
     public function handle_generator_form_submission() {
+
 		$post_image = '';
         if (isset($_POST['generate_blog_post_nonce']) && wp_verify_nonce($_POST['generate_blog_post_nonce'], 'generate_blog_post')) {
             if (isset($_POST['ai_blog_generator_prompt']) && isset($_POST['ai_blog_generator_seo_terms'])) {
@@ -604,7 +606,6 @@ class ai_blog_post_generator {
     }
 
 	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language, $post_image = '') {
-
 		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms . ' Write s complete post using ' . $post_length . ' as the maximum number of words. Write the post in the ' . $this->languages[$language] . ' language.';
 		
 		if(!isset($post_length) || $post_length == '') {
@@ -711,7 +712,7 @@ class ai_blog_post_generator {
 				
 				$redirect_link = site_url( '/wp-admin/edit.php?page=ai-blog-generator&error=' . $error_message );
 			}
-			
+
 			wp_redirect($redirect_link);
 			exit;
 		}
@@ -815,13 +816,13 @@ class ai_blog_post_generator {
 				'post_status'    => 'inherit'
 			);
 			$attachment_id = wp_insert_attachment($attachment, $file);
-
+			
 			wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $file));
 		}
-
+		
 		// Create new post
         $post_data = array(
-            'post_title'     => $post_title,
+			'post_title'     => $post_title,
             'post_content'   => $post_content,
             'post_status'    => $default_post_status,
             'post_author'    => get_current_user_id(),
@@ -1421,6 +1422,10 @@ class ai_blog_post_generator {
 
 	}
 }
+
+// Initialize the plugin
+$ai_blog_post_generator = new ai_blog_post_generator();
+
 
 $unsplash_api_key = get_option('ai_post_unsplash_api_key');
 $open_api_key = get_option('ai_blog_generator_api_key');
