@@ -58,7 +58,6 @@ class ai_blog_post_generator {
 		$this->ai_default_generate_excerpt = get_option('ai_default_generate_excerpt');
 		$this->ai_default_excerpt_length = get_option('ai_default_excerpt_length');
 		$this->ai_post_default_language = get_option('ai_post_default_language');
-		
 		$this->ai_post_default_featured_image = get_option('ai_post_default_featured_image');
 		$this->unsplash_api_key = get_option('ai_post_unsplash_api_key');
 		$this->unsplash_secret_key = get_option('ai_post_unsplash_secret_key');
@@ -543,20 +542,26 @@ class ai_blog_post_generator {
 							?>
 						</td>
                     </tr>
-					<tr>
-						<th><label for="ai_post_featured_image">Featured Image</label> </th>
-						<td><input type="radio" name="royalty" id="royalty">Royalty Free from Unsplash <br><input type="radio" name="dall-e" id="dall-e">Generate with DALL-E 2</td>
-					</tr>
-					<tr>
-						<td></td>
-						<td class="default_image" style="display: none;"><?php echo $this->ai_post_default_featured_image_callback(); ?>
-						<div class="result_image" style="display: none;"><?php echo $this->ai_post_unsplash_images(); ?></div></td>
-					</tr>
-					<tr>
-						<td></td>
-						<td class="dalle_image" style="display: none;"><?php echo $this->ai_post_dalle2_image_callback(); ?>
-						<div class="dalle_result" style="display: none;"><?php echo $this->ai_post_dalle_images(); ?></div></td>
-					</tr>
+					<?php
+					if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+					?>
+						<tr>
+							<th><label for="ai_post_featured_image">Featured Image</label> </th>
+							<td><input type="radio" name="royalty" id="royalty">Royalty Free from Unsplash <br><input type="radio" name="dall-e" id="dall-e">Generate with DALL-E 2</td>
+						</tr>
+						<tr>
+							<td></td>
+							<td class="default_image" style="display: none;"><?php echo $this->ai_post_default_featured_image_callback(); ?>
+							<div class="result_image" style="display: none;"><?php echo $this->ai_post_unsplash_images(); ?></div></td>
+						</tr>
+						<tr>
+							<td></td>
+							<td class="dalle_image" style="display: none;"><?php echo $this->ai_post_dalle2_image_callback(); ?>
+							<div class="dalle_result" style="display: none;"><?php echo $this->ai_post_dalle_images(); ?></div></td>
+						</tr>
+					<?php
+					}
+					?>
                 </table>
                 <?php wp_nonce_field('generate_blog_post', 'generate_blog_post_nonce'); ?>
                 <?php
@@ -598,7 +603,7 @@ class ai_blog_post_generator {
         exit;
     }
 
-	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language, $post_image = null) {
+	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language, $post_image = '') {
 
 		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms . ' Write s complete post using ' . $post_length . ' as the maximum number of words. Write the post in the ' . $this->languages[$language] . ' language.';
 		
@@ -783,25 +788,27 @@ class ai_blog_post_generator {
 		}
 	}
 
-    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt, $post_image = null) {
+    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt, $post_image = '') {
+		$attachment_id = '';
+		$image_data = '';
         $default_post_status = $this->ai_post_default_status ?: 'draft';
 		$default_post_category = $this->ai_post_default_status ?: '0';
 		$default_post_comment_status = $this->ai_post_default_comment_status ?: 'closed';
 		if(!isset($post_category) || $post_category == '') { $post_category = $default_post_category; }
 		if(!isset($post_comment_status) || $post_comment_status == '') { $post_comment_status = $default_post_comment_status; }
-		
-		$image_url = $post_image;
-		$image = file_get_contents($image_url);
-		$parsed_url = parse_url($image_url);
-		$path = $parsed_url['path'];
-		$path_parts = explode('/', $path);
-		$filename = end($path_parts);
-
-		$upload_dir = wp_upload_dir();
-		$image_data = file_put_contents($upload_dir['path'] . '/' . $filename.'.jpg', $image);
+		if(!empty($post_image)){
+			$image_url = $post_image;
+			$image = file_get_contents($image_url);
+			$parsed_url = parse_url($image_url);
+			$path = $parsed_url['path'];
+			$path_parts = explode('/', $path);
+			$filename = end($path_parts);
+			$upload_dir = wp_upload_dir();
+			$image_data = file_put_contents($upload_dir['path'] . '/' . $filename.'.jpg', $image);
+		}
 		if ($image_data) {
 			$file = $upload_dir['path'] . '/' . $filename.'.jpg';
-			$file_type = wp_check_filetype('nombre_de_archivo.jpg', null);
+			$file_type = wp_check_filetype( $filename.'.jpg', null );
 			$attachment = array(
 				'post_mime_type' => $file_type['type'],
 				'post_title'     => $filename.'.jpg',
@@ -823,13 +830,17 @@ class ai_blog_post_generator {
 			'comment_status' => $post_comment_status,
 			'post_category'  => array( $post_category ),
 			'tags_input'     => $seo_terms,
-			'post_thumbnail' => $attachment_id
         );
+
+		if (isset($attachment_id)) {
+			$post_data['post_thumbnail'] = $attachment_id;
+		}
 
         $post_id = wp_insert_post($post_data);
 		wp_set_post_tags($post_id, $seo_terms, true);
-
-		set_post_thumbnail($post_id, $attachment_id);
+		if($attachment_id){
+			set_post_thumbnail($post_id, $attachment_id);
+		}
 
 		if (!empty($this->ai_post_default_featured_image)) {
 			// Attach the default featured image to the post
@@ -1411,17 +1422,13 @@ class ai_blog_post_generator {
 	}
 }
 
-// Initialize the plugin
-$ai_blog_post_generator = new ai_blog_post_generator();
-
-
 $unsplash_api_key = get_option('ai_post_unsplash_api_key');
 $open_api_key = get_option('ai_blog_generator_api_key');
 ?>
 
 <script>
     // Defines a JavaScript variable with the API key
-    var unsplashApiKey = "<?php echo $unsplash_api_key; ?>";
-    var openApiKey = "<?php echo $open_api_key; ?>";
+    var unsplashApiKey = " $unsplash_api_key;";
+    var openApiKey = "$open_api_key;";
 </script>
 

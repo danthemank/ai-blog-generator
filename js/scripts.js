@@ -96,46 +96,53 @@ document.addEventListener('DOMContentLoaded', function() {
 		});
 	}
 
+	if (defaultImageField) {
+		defaultImageField.addEventListener('change', function() {
+			var imageUrl = defaultImageField.value;
+				defaultImagePreview.src = imageUrl;
+		});
+	}
 
-	defaultImageField.addEventListener('change', function() {
-		var imageUrl = defaultImageField.value;
-		defaultImagePreview.src = imageUrl;
-	});
-
-	uploadButton.addEventListener('click', function() {
-		// Check if defaultImageField exists and is empty or not set
-		if (!defaultImageField || defaultImageField.value === '') {
-			if (typeof wp !== 'undefined' && wp.media && wp.media.editor) {
-				wp.media.editor.send.attachment = function(props, attachment) {
+	if (uploadButton) {
+		uploadButton.addEventListener('click', function() {
+			// Check if defaultImageField exists and is empty or not set
+			if (!defaultImageField || defaultImageField.value === '') {
+				if (typeof wp !== 'undefined' && wp.media && wp.media.editor) {
+					wp.media.editor.send.attachment = function(props, attachment) {
+						updateImage(attachment.url);
+					};
+				}
+				wp.media.editor.open(uploadButton);
+				}
+				else {
+					// If the field is already set, allow the user to update the image
+					var imageUrl = defaultImageField.value;
+					wp.media.editor.send.attachment = function(props, attachment) {
 					updateImage(attachment.url);
 				};
+				wp.media.editor.open(uploadButton, imageUrl);
 			}
-			wp.media.editor.open(uploadButton);
-			}
-			else {
-				// If the field is already set, allow the user to update the image
-				var imageUrl = defaultImageField.value;
-				wp.media.editor.send.attachment = function(props, attachment) {
-				updateImage(attachment.url);
-			};
-			wp.media.editor.open(uploadButton, imageUrl);
-		}
-		return false;
-	});
-	
-	unsplashSearchButton.addEventListener('click', function () {
-		var query = prompt('Enter your search term for Unsplash images:');
-		if (query && query.trim() !== '') {
-			searchUnsplash(query);
-		}
+			return false;
 		});
+	}
 
-	dalleSearchButton.addEventListener('click', function () {
-		var query = prompt('Enter your generation term for DALL-E 2 images:');
-		if (query && query.trim() !== '') {
-			generateDalle(query);
-		}
+	if (unsplashSearchButton) {
+		unsplashSearchButton.addEventListener('click', function () {
+			var query = prompt('Enter your search term for Unsplash images:');
+			if (query && query.trim() !== '') {
+				searchUnsplash(query);
+			}
+			});
+	}
+
+	if (dalleSearchButton) {
+		dalleSearchButton.addEventListener('click', function () {
+			var query = prompt('Enter your generation term for DALL-E 2 images:');
+			if (query && query.trim() !== '') {
+				generateDalle(query);
+			}
 		});
+	}
 });
 
 jQuery(document).ready(function() {
