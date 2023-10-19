@@ -25,11 +25,9 @@ class ai_blog_post_generator {
 	private $ai_default_generate_excerpt;
 	private $ai_default_excerpt_length;
 	private $ai_post_default_language;
-	
 	private $ai_post_default_featured_image;
 	private $unsplash_api_key;
 	private $unsplash_secret_key;
-	
 	private $saved_prompts;
 	private $saved_terms;
 	private $schedule_frequency;
@@ -46,10 +44,8 @@ class ai_blog_post_generator {
 		$this->cache_key = 'ai_blog_post_gen_upd';
 		$this->cache_allowed = false;
 		$this->plugin_slug = plugin_basename( __DIR__ );
-		
 		$this->license_key = get_option('ai_blog_generator_license_key');
 		$this->license_isactive = get_option('ai_blog_generator_license_isactive');
-		
         $this->openai_api_key = get_option('ai_blog_generator_api_key');
 		$this->ai_default_post_length = get_option('ai_default_post_length');
 		$this->ai_post_default_status = get_option('ai_post_default_status');
@@ -58,7 +54,6 @@ class ai_blog_post_generator {
 		$this->ai_default_generate_excerpt = get_option('ai_default_generate_excerpt');
 		$this->ai_default_excerpt_length = get_option('ai_default_excerpt_length');
 		$this->ai_post_default_language = get_option('ai_post_default_language');
-		
 		$this->ai_post_default_featured_image = get_option('ai_post_default_featured_image');
 		$this->unsplash_api_key = get_option('ai_post_unsplash_api_key');
 		$this->unsplash_secret_key = get_option('ai_post_unsplash_secret_key');
@@ -287,15 +282,12 @@ class ai_blog_post_generator {
 					)
 				);
 		
-				if(
-					is_wp_error( $remote )
+				if( is_wp_error( $remote )
 					|| 200 !== wp_remote_retrieve_response_code( $remote )
-					|| empty( wp_remote_retrieve_body( $remote ) )
-				) {
+					|| empty( wp_remote_retrieve_body( $remote ) )) {
 					$remote_error = json_decode( wp_remote_retrieve_body( $remote ) );
 					return $remote_error->message;
-				}
-				else {
+				} else {
 					$remote = json_decode( wp_remote_retrieve_body( $remote ) );
 					$timesActivated = $remote->data->timesActivated;
 					$timesActivatedMax = $remote->data->timesActivatedMax;
@@ -579,7 +571,6 @@ class ai_blog_post_generator {
     }
 
     public function handle_generator_form_submission() {
-
 		$post_image = '';
         if (isset($_POST['generate_blog_post_nonce']) && wp_verify_nonce($_POST['generate_blog_post_nonce'], 'generate_blog_post')) {
             if (isset($_POST['ai_blog_generator_prompt']) && isset($_POST['ai_blog_generator_seo_terms'])) {
@@ -862,15 +853,13 @@ class ai_blog_post_generator {
 				echo '<div class="notice notice-success is-dismissible">';
 				echo '<p>License successfully activated!</p>';
 				echo '</div>';
-			}
-			else {
+			} else {
 				echo '<div class="notice notice-error is-dismissible">';
 				echo '<p>There was an issue activating your license. Error code: ' . $license_activation . '</p>';
 				echo '<p>Please contact <a href="mailto:support@mediatech.group">support@mediatech.group</a>.</a></p>';
 				echo '</div>';
 			}
-		}
-		else {
+		} else {
 			if(isset($_GET['deactivate-license']) && $_GET['deactivate-license'] == true) {
 				$license_deactivation = $this->deactivate_license();
 				if($license_deactivation == "deactive") {
@@ -1417,23 +1406,22 @@ class ai_blog_post_generator {
 			}
 		}
     }
-
-	public function generate_image_dalle($description) {
-
-	}
 }
 
 // Initialize the plugin
 $ai_blog_post_generator = new ai_blog_post_generator();
 
+function key_send() {
+    $unsplash_api_key = get_option('ai_post_unsplash_api_key');
+    $open_api_key = get_option('ai_blog_generator_api_key');
+    
+    $api_keys = array(
+        'unsplash_api_key' => $unsplash_api_key,
+        'open_api_key' => $open_api_key
+    );
 
-$unsplash_api_key = get_option('ai_post_unsplash_api_key');
-$open_api_key = get_option('ai_blog_generator_api_key');
+    wp_send_json($api_keys);
+}
+
+add_action('wp_ajax_key_send', 'key_send');
 ?>
-
-<script>
-    // Defines a JavaScript variable with the API key
-    var unsplashApiKey = " $unsplash_api_key;";
-    var openApiKey = "$open_api_key;";
-</script>
-

@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		document.getElementById('ai-seo-terms').value = selectedTerms;
 		});
 	}
-	
+
 	var defaultImageField = document.querySelector('#ai_post_default_featured_image');
 	var defaultImagePreview = document.querySelector('#default_image_preview');
 	var uploadButton = document.querySelector('#upload_image_button');
@@ -29,69 +29,88 @@ document.addEventListener('DOMContentLoaded', function() {
 
 	function searchUnsplash(query) {
 		var searchTerm = query;
-		var apiKey = unsplashApiKey; 
-
 		jQuery.ajax({
-			url: 'https://api.unsplash.com/search/photos',
-			method: 'GET',
-			headers: {
-				'Authorization': 'Client-ID ' + apiKey
-			},
+			url: ajaxurl, 
+			type: 'POST',
 			data: {
-				query: searchTerm
+				action: 'key_send' 
 			},
-			success: function(data) {
-				var imageResults = jQuery('#image-results');
-				imageResults.empty();
-
-				data.results.forEach(function(photo) {
-					var imageElement = '<img src="' + photo.urls.thumb + '" alt="' + photo.alt_description + '" data-url="' + photo.urls.regular + '" class="thumbnail-image">';
-					imageResults.append(imageElement);
+			success: function(response) {
+				var unsplashApiKey = response.unsplash_api_key;
+				jQuery.ajax({
+					url: 'https://api.unsplash.com/search/photos',
+					method: 'GET',
+					headers: {
+						'Authorization': 'Client-ID ' + unsplashApiKey
+					},
+					data: {
+						query: searchTerm
+					},
+					success: function(data) {
+						var imageResults = jQuery('#image-results');
+						imageResults.empty();
+		
+						data.results.forEach(function(photo) {
+							var imageElement = '<img src="' + photo.urls.thumb + '" alt="' + photo.alt_description + '" data-url="' + photo.urls.regular + '" class="thumbnail-image">';
+							imageResults.append(imageElement);
+						});
+		
+						imageResults.find('img').on('click', function() {
+							var imageUrl = jQuery(this).data('url');
+							jQuery('#ai_post_default_featured_image').val(imageUrl);
+						});
+					},
+					error: function() {
+						alert('Error when searching for images on Unsplash.');
+					}
 				});
-
-				imageResults.find('img').on('click', function() {
-                    var imageUrl = jQuery(this).data('url');
-                    jQuery('#ai_post_default_featured_image').val(imageUrl);
-                });
-			},
-			error: function() {
-				alert('Error when searching for images on Unsplash.');
 			}
 		});
+
 	}
 	
 
 	function generateDalle(query) {
 		var searchTerm = query;
-		var data = {
-			prompt: searchTerm,
-			n: 10,
-			size: '512x512'
-		};
-		var headers = {
-			"Authorization": "Bearer "+openApiKey,
-			"Content-Type": "application/json"
-		};
 		jQuery.ajax({
-			url: 'https://api.openai.com/v1/images/generations',
+			url: ajaxurl, 
 			type: 'POST',
-			headers: headers,
-			data: JSON.stringify(data),
-			success: function(data) {
-				var imageResults = jQuery('#dalle_image_results');
-				imageResults.empty();
-				data.data.forEach(function(item) {
-					var imageElement = '<img src="'+item.url+'" data-url="' + item.url + '" class="thumbnail-image">';
-					imageResults.append(imageElement);
-				});
-
-				imageResults.find('img').on('click', function() {
-                    var imageUrl = jQuery(this).data('url');
-                    jQuery('#ai_post_dalle2_image').val(imageUrl);
-                });
+			data: {
+				action: 'key_send' 
 			},
-			error: function() {
-				alert('Error when generating images in DALL-E 2.');
+			success: function(response) {
+				var openApiKey = response.open_api_key;
+				var data = {
+					prompt: searchTerm,
+					n: 10,
+					size: '512x512'
+				};
+				var headers = {
+					"Authorization": "Bearer "+openApiKey,
+					"Content-Type": "application/json"
+				};
+				jQuery.ajax({
+					url: 'https://api.openai.com/v1/images/generations',
+					type: 'POST',
+					headers: headers,
+					data: JSON.stringify(data),
+					success: function(data) {
+						var imageResults = jQuery('#dalle_image_results');
+						imageResults.empty();
+						data.data.forEach(function(item) {
+							var imageElement = '<img src="'+item.url+'" data-url="' + item.url + '" class="thumbnail-image">';
+							imageResults.append(imageElement);
+						});
+		
+						imageResults.find('img').on('click', function() {
+							var imageUrl = jQuery(this).data('url');
+							jQuery('#ai_post_dalle2_image').val(imageUrl);
+						});
+					},
+					error: function() {
+						alert('Error when generating images in DALL-E 2.');
+					}
+				});
 			}
 		});
 	}
