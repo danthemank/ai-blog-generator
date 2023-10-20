@@ -316,7 +316,7 @@ function more_fields() {
                                                     </label>
                                                     <br />
                                                     <input type="text" id="ai_post_dalle${rowCount + 1}" name="ai_post_dalle${rowCount + 1}" style="width: 25%;"/>
-                                                    <input type="button" class="button" id="dalle_search_button${rowCount + 1}" value="${'Generate DALL-E 2'}" />
+                                                    <input type="button" class="button" id="dalle_search_button${rowCount + 1}" value="${'Generate DALL-E 2'}" data-id="${rowCount + 1}"/>
                                                     <p class="description">
                                                     ${'Type what you want to generate with DALL-E 2.'}  
                                                     </p>
@@ -444,9 +444,13 @@ function more_fields() {
                         if (jQuery(this).is(':checked')) {
                             jQuery('.dalle_input'+adjustedIndex).css('display', 'table-row');
                             jQuery('#dalle_search_button'+adjustedIndex).on('click', function () {
-                                if (!promptShownDa) {
-                                    promptShownDa = true;
-                                        var query = prompt('Enter your generation term for DALL-E 2 images:');
+                                var dataID = jQuery(this).data('id')
+                               /*  if (!promptShownDa) {
+                                    promptShownDa = true; */
+                                    if (!jQuery(this).data('promptShown')) {
+                                        jQuery(this).data('promptShown', true);
+
+                                        var query = prompt('Enter your generation term for DALL-E 2 images:'+dataID);
                                         if (query && query.trim() !== '') {
                                             jQuery.ajax({
                                                 url: ajaxurl, 
@@ -492,16 +496,14 @@ function more_fields() {
                                                 });
                                             }
                                         });
-                                    } else {
+                                    } /* else {
                                         promptShownDa = false;
-                                    }
+                                    } */
                                 }
                             });
                     } else {
                         jQuery('#dalle_input').css('display', 'none');
                     }
-
-                    promptShownDa = false;
                 });
                 jQuery("#royalty" + adjustedIndex).change(function() {
                     if (jQuery(this).is(':checked')) {

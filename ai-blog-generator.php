@@ -1179,7 +1179,7 @@ class ai_blog_post_generator {
 								// Display the textarea for terms
 								echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;">' . esc_textarea($term['term']) . '</textarea></td>';
 
-								echo '<td class="radios"><input type="radio" name="royalty1" id="royalty1">Royalty Free from Unsplash <br><input type="radio" name="dall-e1" id="dall-e1">Generate with DALL-E 2</td>';
+								echo '<td class="radios"><input type="radio" name="royalty[1]" class="royalty1" id="royalty[1]">Royalty Free from Unsplash <br><input type="radio" name="dall-e[1]" class="dall-e1" id="dall-e[1]">Generate with DALL-E 2</td>';
 							echo '</tr>';
 							?>
 							<tr class="unsplash_input1" style="display: none;">
