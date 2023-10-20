@@ -13,7 +13,7 @@
  */
 
 defined( 'ABSPATH' ) || exit;
-
+require_once plugin_dir_path( __FILE__ ).'ajax/ajax.php';
 class ai_blog_post_generator {
 	private $license_key;
 	private $license_isactive;
@@ -25,11 +25,9 @@ class ai_blog_post_generator {
 	private $ai_default_generate_excerpt;
 	private $ai_default_excerpt_length;
 	private $ai_post_default_language;
-	
 	private $ai_post_default_featured_image;
 	private $unsplash_api_key;
 	private $unsplash_secret_key;
-	
 	private $saved_prompts;
 	private $saved_terms;
 	private $schedule_frequency;
@@ -46,10 +44,8 @@ class ai_blog_post_generator {
 		$this->cache_key = 'ai_blog_post_gen_upd';
 		$this->cache_allowed = false;
 		$this->plugin_slug = plugin_basename( __DIR__ );
-		
 		$this->license_key = get_option('ai_blog_generator_license_key');
 		$this->license_isactive = get_option('ai_blog_generator_license_isactive');
-		
         $this->openai_api_key = get_option('ai_blog_generator_api_key');
 		$this->ai_default_post_length = get_option('ai_default_post_length');
 		$this->ai_post_default_status = get_option('ai_post_default_status');
@@ -58,7 +54,6 @@ class ai_blog_post_generator {
 		$this->ai_default_generate_excerpt = get_option('ai_default_generate_excerpt');
 		$this->ai_default_excerpt_length = get_option('ai_default_excerpt_length');
 		$this->ai_post_default_language = get_option('ai_post_default_language');
-		
 		$this->ai_post_default_featured_image = get_option('ai_post_default_featured_image');
 		$this->unsplash_api_key = get_option('ai_post_unsplash_api_key');
 		$this->unsplash_secret_key = get_option('ai_post_unsplash_secret_key');
@@ -112,6 +107,7 @@ class ai_blog_post_generator {
 		add_filter( 'site_transient_update_plugins', array( $this, 'update' ) );
 		add_action( 'upgrader_process_complete', array( $this, 'purge' ), 10, 2 );
     }
+
 	
 	public function request() {
 		$remote = get_transient( $this->cache_key );
@@ -233,7 +229,7 @@ class ai_blog_post_generator {
 	
 	public function check_license() {
 		$remote_address = 'https://mediatech.group/wp-json/lmfwc/v2/licenses/validate/' . $this->license_key . '?consumer_key=ck_2f23c57a984551bba08e3b5d8f6e59b6b0cd5484&consumer_secret=cs_86b7379a65ccced73943315d16854f200376dc53';
-		
+
 		$remote = wp_remote_get(
 			$remote_address,
 			array(
@@ -275,7 +271,6 @@ class ai_blog_post_generator {
 			
 			if(preg_match($pattern, $this->license_key)) {
 				$remote_address = 'https://mediatech.group/wp-json/lmfwc/v2/licenses/activate/' . $this->license_key . '?consumer_key=ck_2f23c57a984551bba08e3b5d8f6e59b6b0cd5484&consumer_secret=cs_86b7379a65ccced73943315d16854f200376dc53';
-
 				$remote = wp_remote_get(
 					$remote_address,
 					array(
@@ -286,16 +281,13 @@ class ai_blog_post_generator {
 						)
 					)
 				);
-
-				if(
-					is_wp_error( $remote )
+		
+				if( is_wp_error( $remote )
 					|| 200 !== wp_remote_retrieve_response_code( $remote )
-					|| empty( wp_remote_retrieve_body( $remote ) )
-				) {
+					|| empty( wp_remote_retrieve_body( $remote ) )) {
 					$remote_error = json_decode( wp_remote_retrieve_body( $remote ) );
 					return $remote_error->message;
-				}
-				else {
+				} else {
 					$remote = json_decode( wp_remote_retrieve_body( $remote ) );
 					$timesActivated = $remote->data->timesActivated;
 					$timesActivatedMax = $remote->data->timesActivatedMax;
@@ -360,7 +352,6 @@ class ai_blog_post_generator {
 	public function enqueue_admin_scripts() {
 		if(isset($this->unsplash_api_key) && !empty($this->unsplash_api_key)) {
 			wp_enqueue_script('unsplash-api', 'https://unpkg.com/unsplash-js@7.3.0/dist/unsplash.min.js');
-			wp_add_inline_script('unsplash-api', 'const unsplash = new UnsplashJS.default({ accessKey: "' $this->unsplash_api_key . '" });');
 		}
 		
 		// Enqueue media scripts
@@ -544,6 +535,26 @@ class ai_blog_post_generator {
 							?>
 						</td>
                     </tr>
+					<?php
+					if(isset($this->license_isactive) && $this->license_isactive == 'active') {
+					?>
+						<tr>
+							<th><label for="ai_post_featured_image">Featured Image</label> </th>
+							<td><input type="radio" name="royalty" id="royalty">Royalty Free from Unsplash <br><input type="radio" name="dall-e" id="dall-e">Generate with DALL-E 2</td>
+						</tr>
+						<tr>
+							<td></td>
+							<td class="default_image" style="display: none;"><?php echo $this->ai_post_default_featured_image_callback(); ?>
+							<div class="result_image" style="display: none;"><?php echo $this->ai_post_unsplash_images(); ?></div></td>
+						</tr>
+						<tr>
+							<td></td>
+							<td class="dalle_image" style="display: none;"><?php echo $this->ai_post_dalle2_image_callback(); ?>
+							<div class="dalle_result" style="display: none;"><?php echo $this->ai_post_dalle_images(); ?></div></td>
+						</tr>
+					<?php
+					}
+					?>
                 </table>
                 <?php wp_nonce_field('generate_blog_post', 'generate_blog_post_nonce'); ?>
                 <?php
@@ -560,6 +571,7 @@ class ai_blog_post_generator {
     }
 
     public function handle_generator_form_submission() {
+		$post_image = '';
         if (isset($_POST['generate_blog_post_nonce']) && wp_verify_nonce($_POST['generate_blog_post_nonce'], 'generate_blog_post')) {
             if (isset($_POST['ai_blog_generator_prompt']) && isset($_POST['ai_blog_generator_seo_terms'])) {
                 $prompt = sanitize_text_field($_POST['ai_blog_generator_prompt']);
@@ -570,16 +582,21 @@ class ai_blog_post_generator {
 				$excerpt_length = $_POST['ai_default_generate_excerpt'];
 				$post_comment_status = $_POST['ai_post_default_comment_status'];
 				$post_language = $_POST['ai_post_default_language'];
-
+				if(!empty($_POST['ai_post_default_featured_image'])) {
+					$post_image = $_POST['ai_post_default_featured_image'];
+				}
+				if(!empty($_POST['ai_post_dalle2_image'])) {
+					$post_image = $_POST['ai_post_dalle2_image'];
+				}
                 if (!empty($prompt)) {
-                    $this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language);
+                    $this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language, $post_image);
                 }
             }
         }
         exit;
     }
-	
-	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language) {
+
+	public function generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $language, $post_image = '') {
 		$prompt = "Write me a blog post given the following instructions and description: " . sanitize_text_field($prompt) . " Use the following keywords to optimize for search engines: " . $seo_terms . ' Write s complete post using ' . $post_length . ' as the maximum number of words. Write the post in the ' . $this->languages[$language] . ' language.';
 		
 		if(!isset($post_length) || $post_length == '') {
@@ -620,7 +637,7 @@ class ai_blog_post_generator {
 			'body' => json_encode($data),
 			'headers' => $headers,
 			'method' => 'POST',
-			'timeout' => 30,
+			'timeout' => 90,
 		);
 
 		$response = wp_remote_request($url, $args);
@@ -652,8 +669,6 @@ class ai_blog_post_generator {
 					if (strpos($generated_content, $prefix) === 0) {
 						$generated_content = substr($generated_content, strlen($prefix));
 					}
-					
-					//$generated_content = str_replace($prefix . $generated_title . "\n", '', $generated_content);
 
 					// Trim the generated text again to remove any leading/trailing whitespaces or newline characters
 					$generated_content = trim($generated_content);
@@ -668,8 +683,7 @@ class ai_blog_post_generator {
 					if($generate_excerpt == 'yes') {
 						$generated_excerpt = $this->generate_post_excerpt($original_result, $excerpt_length, $language);
 					}
-
-					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt);
+					$new_post = $this->generate_post($generated_title, $generated_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt, $post_image);
 					$redirect_link = site_url( '/wp-admin/edit.php?page=ai-blog-generator&new_post=' . $new_post );
 				}
 				else {
@@ -689,7 +703,7 @@ class ai_blog_post_generator {
 				
 				$redirect_link = site_url( '/wp-admin/edit.php?page=ai-blog-generator&error=' . $error_message );
 			}
-			
+
 			wp_redirect($redirect_link);
 			exit;
 		}
@@ -766,16 +780,40 @@ class ai_blog_post_generator {
 		}
 	}
 
-    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt) {
+    public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt, $post_image = '') {
+		$attachment_id = '';
+		$image_data = '';
         $default_post_status = $this->ai_post_default_status ?: 'draft';
 		$default_post_category = $this->ai_post_default_status ?: '0';
 		$default_post_comment_status = $this->ai_post_default_comment_status ?: 'closed';
 		if(!isset($post_category) || $post_category == '') { $post_category = $default_post_category; }
 		if(!isset($post_comment_status) || $post_comment_status == '') { $post_comment_status = $default_post_comment_status; }
+		if(!empty($post_image)){
+			$image_url = $post_image;
+			$image = file_get_contents($image_url);
+			$parsed_url = parse_url($image_url);
+			$path = $parsed_url['path'];
+			$path_parts = explode('/', $path);
+			$filename = end($path_parts);
+			$upload_dir = wp_upload_dir();
+			$image_data = file_put_contents($upload_dir['path'] . '/' . $filename.'.jpg', $image);
+		}
+		if ($image_data) {
+			$file = $upload_dir['path'] . '/' . $filename.'.jpg';
+			$file_type = wp_check_filetype( $filename.'.jpg', null );
+			$attachment = array(
+				'post_mime_type' => $file_type['type'],
+				'post_title'     => $filename.'.jpg',
+				'post_status'    => 'inherit'
+			);
+			$attachment_id = wp_insert_attachment($attachment, $file);
+			
+			wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $file));
+		}
 		
 		// Create new post
         $post_data = array(
-            'post_title'     => $post_title,
+			'post_title'     => $post_title,
             'post_content'   => $post_content,
             'post_status'    => $default_post_status,
             'post_author'    => get_current_user_id(),
@@ -786,12 +824,19 @@ class ai_blog_post_generator {
 			'tags_input'     => $seo_terms,
         );
 
+		if (isset($attachment_id)) {
+			$post_data['post_thumbnail'] = $attachment_id;
+		}
+
         $post_id = wp_insert_post($post_data);
 		wp_set_post_tags($post_id, $seo_terms, true);
-		
+		if($attachment_id){
+			set_post_thumbnail($post_id, $attachment_id);
+		}
 		if (!empty($this->ai_post_default_featured_image)) {
 			// Attach the default featured image to the post
 			$image_id = attachment_url_to_postid($this->ai_post_default_featured_image);
+
 			if ($image_id) {
 				set_post_thumbnail($post_id, $image_id);
 			}
@@ -801,20 +846,20 @@ class ai_blog_post_generator {
 
     public function render_settings_page() {
 		if(isset($_GET['activate-license']) && $_GET['activate-license'] == true) {
+			
 			$license_activation = $this->activate_license();
+	
 			if($license_activation == "active") {
 				echo '<div class="notice notice-success is-dismissible">';
 				echo '<p>License successfully activated!</p>';
 				echo '</div>';
-			}
-			else {
+			} else {
 				echo '<div class="notice notice-error is-dismissible">';
 				echo '<p>There was an issue activating your license. Error code: ' . $license_activation . '</p>';
 				echo '<p>Please contact <a href="mailto:support@mediatech.group">support@mediatech.group</a>.</a></p>';
 				echo '</div>';
 			}
-		}
-		else {
+		} else {
 			if(isset($_GET['deactivate-license']) && $_GET['deactivate-license'] == true) {
 				$license_deactivation = $this->deactivate_license();
 				if($license_deactivation == "deactive") {
@@ -829,13 +874,6 @@ class ai_blog_post_generator {
 					echo '</div>';
 				}
 			}
-			/* else {
-				if($this->license_isactive == 'active') {
-					if($this->check_license() == 'active') {
-						
-					}
-				}
-			} */
 		}
         ?>
         <div class="wrap">
@@ -865,6 +903,7 @@ class ai_blog_post_generator {
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_language');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_default_featured_image');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_unsplash_api_key');
+		register_setting('ai_blog_generator_settings_group', 'ai_post_unsplash_images');
 		register_setting('ai_blog_generator_settings_group', 'ai_post_unsplash_secret_key');
 		
 		add_settings_section(
@@ -956,6 +995,14 @@ class ai_blog_post_generator {
 		);
 		
 		add_settings_field(
+			'ai_post_unsplash_images',
+			'',
+			array($this, 'ai_post_unsplash_images'),
+			'ai_blog_generator_settings_group',
+			'post_generator_main_section'
+		);
+
+		add_settings_field(
 			'ai_post_unsplash_api_key',
 			'Unsplash API Key',
 			array($this, 'ai_post_unsplash_api_key_callback'),
@@ -974,7 +1021,7 @@ class ai_blog_post_generator {
 		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_prompt_seo_terms');
 			register_setting('ai_blog_generator_settings_group', 'ai_blog_generator_schedule_frequency');
-			
+
 			add_settings_field(
 				'ai_blog_generator_prompt_seo_terms',
 				'Topics and Terms',
@@ -999,18 +1046,31 @@ class ai_blog_post_generator {
 	
 	// Callback functions for the new fields
 	public function ai_blog_generator_license_key_callback() {
-		?>
-		<input type="text" id="ai_blog_generator_license_key" name="ai_blog_generator_license_key" value="<?php echo esc_attr($this->license_key); ?>" />
+
+		if ( empty( $this->license_key )) {
+					?>
+			<form method="post" action="<?php echo esc_url(admin_url('options-general.php?page=ai-blog-generator-settings&activate-license=true')); ?>" id="license-form">
+				<input type="text" id="ai_blog_generator_license_key" name="ai_blog_generator_license_key"  />
+				<?php 
+					echo '<input type="submit" name="activate_license" value="Activate License">';
+					echo '<p style="font-style:italic;">(this plugin is FREE, but there are lots of other amazing features in the premium version <a href="https://mediatech.group/product/ai-blog-post-generator-premium-licensing/" target="blank">here</a>)</p>';
+				?>
+			<form>
 		<?php
-		$license_isactive = get_option('ai_blog_generator_license_isactive');
-		if(isset($license_isactive) && $license_isactive == 'active')
-		{
-			echo '<span style="color:#007f00;">Valid License</span>';
-			echo ' | <a href="' . site_url( '/wp-admin/options-general.php?page=ai-blog-generator-settings&deactivate-license=true' ) . '">Deactivate</a>';
-		}
-		else {
-			echo '<a href="' . site_url( '/wp-admin/options-general.php?page=ai-blog-generator-settings&activate-license=true' ) . '">Activate License</a>';
-			echo '<p style="font-style:italic;">(this plugin is FREE, but there are lots of other amazing features in the premium version <a href="https://mediatech.group/product/ai-blog-post-generator-premium-licensing/" target="blank">here</a>)</p>';
+		} else {
+			?>
+			<input type="text" id="ai_blog_generator_license_key" name="ai_blog_generator_license_key" value="<?php echo esc_attr($this->license_key); ?>" />
+			<?php
+			$license_isactive = get_option('ai_blog_generator_license_isactive');
+			if(isset($license_isactive) && $license_isactive == 'active')
+			{
+				echo '<span style="color:#007f00;">Valid License</span>';
+				echo ' | <a href="' . esc_url(admin_url( 'options-general.php?page=ai-blog-generator-settings&deactivate-license=true' ) ). '">Deactivate</a>';
+			}
+			else {
+				echo '<a href="' . esc_url(admin_url( 'options-general.php?page=ai-blog-generator-settings&activate-license=true' )). '">Now activates the license</a>';
+				echo '<p style="font-style:italic;">(this plugin is FREE, but there are lots of other amazing features in the premium version <a href="https://mediatech.group/product/ai-blog-post-generator-premium-licensing/" target="blank">here</a>)</p>';
+			}
 		}
 	}
 	
@@ -1113,25 +1173,78 @@ class ai_blog_post_generator {
 						foreach ($this->saved_prompts as $index => $prompt) {
 							$term = isset($this->saved_terms[$index]) ? $this->saved_terms[$index] : ''; // Get the corresponding term
 
-							echo '<tr>';
+							echo '<tr class="row">';
 							// Display the textarea for prompt
-								echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" style="resize: none; width: 100%;">' . esc_textarea($prompt['prompt']) . '</textarea></td>';
+								echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;">' . esc_textarea($prompt['prompt']) . '</textarea></td>';
 								// Display the textarea for terms
-								echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" style="resize: none; width: 100%;">' . esc_textarea($term['term']) . '</textarea></td>';
+								echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;">' . esc_textarea($term['term']) . '</textarea></td>';
+
+								echo '<td class="radios"><input type="radio" name="royalty1" id="royalty1">Royalty Free from Unsplash <br><input type="radio" name="dall-e1" id="dall-e1">Generate with DALL-E 2</td>';
 							echo '</tr>';
-						}
-					}
-					else {
+							?>
+							<tr class="unsplash_input1" style="display: none;">
+								<td class="default_image1"  colspan="3"><?php echo $this->ai_post_featured_image_callback(); ?>
+								<div id="result_image1" class="image-results"></div></td>
+							</tr>
+							<tr class="dalle_input1" style="display: none;">
+								<td class="dalle_image1" colspan="3"><?php echo $this->ai_post_dalle2(); ?>
+								<div id="dalle_result1" class="image-results"></div></td>
+							</tr>
+						<?php }
+					} else {
 						// Display the textarea for prompt
-						echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" style="resize: none; width: 100%;"></textarea></td>';
+						echo '<tr class="row"><td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;"></textarea></td>';
 
 						// Display the textarea for terms
-						echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" style="resize: none; width: 100%;"></textarea></td>';
+						echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;"></textarea></td></tr>';
 					}
 				?>
+			<tr class ="rowButton">
+				<td>
+					<div class="tooltip">
+						<button id="blog_button1" class="blog_button1" name="blog_button1" type="button">Suggest Based on Blog</button>
+						<div class="tooltip-text">
+							<?php
+							echo "Generate a blog post topic + relevant SEO terms based on existing posts within your website's blog.";
+							?>
+						</div>
+					</div>
+					<?php 
+					if (is_plugin_active('woocommerce/woocommerce.php')) {
+					
+					?>
+						<div class="tooltip">
+								<button id="store_button1" class="store_button1" name="store_button1" type="button">Suggest Based on Store</button>
+								<div class="tooltip-text">
+									<?php
+									echo "Generate a blog post topic + relevant SEO terms based on existing products in your woocommerce store.";
+									?>
+								</div>
+						</div>
+					<?php } ?>
+					<div class="tooltip">
+						<button id="page_button1" class="page_button1" name="page_button1" type="button">Suggest Based on Pages</button>
+						<div class="tooltip-text">
+							<?php
+							echo "Generate a blog post topic + relevant SEO terms based on existing pages in your website.";
+							?>
+						</div>
+					</div>
+				</td>
+				<td>
+					<div class="tooltip">
+						<button id="seo_button1" class="seo_button1" name="seo_button1" type="button">Suggest SEO Terms Based on Current Post Title</button>
+						<div class="tooltip-text">
+							<?php
+							echo "Generate a list of SEO terms based on the Blog Post Topic.";
+							?>
+						</div>
+					</div>
+				</td>
+			</tr>
 			</tbody>
 		</table>
-		<input style="margin-top: 15px;" type="button" id="more_fields" onclick="add_fields();" value="Add More" class="btn btn-info" />
+		<input style="margin-top: 15px;" type="button" id="more_fields" value="Add More" class="btn btn-info" />
 		<?php
 		}
 	}
@@ -1163,20 +1276,107 @@ class ai_blog_post_generator {
 				<input type="button" class="button" id="upload_image_button" value="<?php _e('Upload Image', 'textdomain'); ?>" />
 				<?php
 					if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
-						echo '<input type="button" class="button" id="unsplash_search_button" value="' . _e('Search Unsplash', 'textdomain') . '" />';
+						?>
+						<input type="button" class="button" id="unsplash_search_button" value="<?php _e('Search Unsplash', 'textdomain'); ?>" />
+						<?php
 					}
 				?>
 				<p class="description">
 					<?php _e('Select or upload the default featured image for new posts.', 'textdomain'); ?>
 				</p>
-			</div>
+			</div>		
 			<div>
 				<img id="default_image_preview" src="<?php echo $this->ai_post_default_featured_image; ?>" />
 			</div>
 		</div>
 		<?php
 	}
+
+	public function ai_post_featured_image_callback() {
+		?>
+		<div id='image_table_settings'>
+			<div>
+				<label for="ai_post_featured_image">
+				<?php _e('Featured Image', 'textdomain'); ?>
+				</label>
+				<br />
+				<input type="text" id="ai_post_featured_image1" name="ai_post_featured_image1" style="width: 25%;"/>
+				<input type="button" class="button" id="upload_image_button1" value="<?php _e('Upload Image', 'textdomain'); ?>" />
+				<?php
+					if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
+						?>
+						<input type="button" class="button" id="unsplash_search_button1" value="<?php _e('Search Unsplash', 'textdomain'); ?>" />
+						<?php
+					}
+				?>
+				<p class="description">
+					<?php _e('Select or upload the default featured image for new posts.', 'textdomain'); ?>
+				</p>
+			</div>		
+		</div>
+		<?php
+	}
 	
+	public function ai_post_unsplash_images() {
+		?>
+		<div id="image-results" class="image-results"></div>
+		<?php
+	}
+
+	public function ai_post_dalle2_image_callback() {
+		?>
+		<div id='dalle_table'>
+			<div>
+				<label for="ai_post_dalle2_image">
+				<?php _e('Image Url', 'textdomain'); ?>
+				</label>
+				<br />
+				<input type="text" id="ai_post_dalle2_image" name="ai_post_dalle2_image" style="width: 25%;"/>
+				<?php
+					if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
+						?>
+						<input type="button" class="button" id="dalle_search_button" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
+						<?php
+					}
+				?>
+				<p class="description">
+					<?php _e('Type what you want to generate with DALL-E 2.', 'textdomain'); ?>
+				</p>
+			</div>
+		</div>
+		<?php
+	}
+
+	public function ai_post_dalle2() {
+		?>
+		<div id='dalle_table'>
+			<div>
+				<label for="ai_post_dalle1">
+				<?php _e('Image Url', 'textdomain'); ?>
+				</label>
+				<br />
+				<input type="text" id="ai_post_dalle1" name="ai_post_dalle1" style="width: 25%;"/>
+				<?php
+					if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
+						?>
+						<input type="button" class="button" id="dalle_search_button1" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
+						<?php
+					}
+				?>
+				<p class="description">
+					<?php _e('Type what you want to generate with DALL-E 2.', 'textdomain'); ?>
+				</p>
+			</div>
+		</div>
+		<?php
+	}
+
+	public function ai_post_dalle_images() {
+		?>
+		<div id="dalle_image_results" class="dalle_image_results"></div>
+		<?php
+	}
+
 	public function ai_post_unsplash_api_key_callback() {
 		?>
 		<input type="text" id="ai_post_unsplash_api_key" name="ai_post_unsplash_api_key" value="<?php if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') { echo esc_attr($this->unsplash_api_key); } else { echo ''; } ?>" />
@@ -1221,7 +1421,7 @@ class ai_blog_post_generator {
 	}
 	
 	public function schedule_post_generation() {
-		if(isset($license_isactive) && $this->license_isactive == 'active') {
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			$frequency = $this->schedule_frequency;
 			if ($frequency === 'daily') {
 				$time = strtotime('tomorrow');
@@ -1243,7 +1443,8 @@ class ai_blog_post_generator {
     }
 	
 	public function generate_scheduled_post() {	
-		if(isset($license_isactive) && $this->license_isactive == 'active') {
+		$prompt_seo_terms = [];
+		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			if (!empty($this->saved_prompts)) {
 				//We need pick one, maybe a setting is needed to determine how best to do this, but for now we will just take the first one that is available
 				$prompt = $this->saved_prompts[0];
@@ -1265,17 +1466,22 @@ class ai_blog_post_generator {
 			}
 		}
     }
-	
-	public function generate_seo_terms($blog_topic) {
-		/* 
-		//Make setting for default number of generated keywords/phrases
-		$prompt = "Give me a of SEO keywords and keyphrases (up to 5) for a blog post about " . $blog_topic . ". The list should be in a comma-separated format and not in a numbered list.";
-		
-		$system_content = 'You are a search engine optimization expert preparing keywords and keyphrases that will be implemented within a new blog post which is written in a following step.';
-
-        */
-	}
 }
 
 // Initialize the plugin
 $ai_blog_post_generator = new ai_blog_post_generator();
+
+function key_send() {
+    $unsplash_api_key = get_option('ai_post_unsplash_api_key');
+    $open_api_key = get_option('ai_blog_generator_api_key');
+    
+    $api_keys = array(
+        'unsplash_api_key' => $unsplash_api_key,
+        'open_api_key' => $open_api_key
+    );
+
+    wp_send_json($api_keys);
+}
+
+add_action('wp_ajax_key_send', 'key_send');
+?>
