@@ -266,6 +266,8 @@ function more_fields() {
     ?>
     <script>
         jQuery(document).ready(function() {
+            var promptShownUn = false;
+            var promptShownDa = false;
             jQuery("#more_fields").on("click", function() {
                 var blogTooltipText = "Generate a blog post topic + relevant SEO terms based on existing posts within your website's blog.";
                 var seoTooltipText = "Generate a list of SEO terms based on the Blog Post Topic.";
@@ -277,12 +279,67 @@ function more_fields() {
                 newRow.className = "row";
                 var newButton = table.insertRow(-1);
                 newButton.className = "rowButton";
-                newRow.innerHTML = '<td><textarea placeholder="New Blog Topic" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_' + (rowCount + 1) + '" style="resize: none; width: 100%;"></textarea></td><td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_' + (rowCount + 1) + '" style="resize: none; width: 100%;"></textarea></td>';
-                newButton.innerHTML = '<td><div class="tooltip"><button id="blog_button' + (rowCount + 1) + '" class="blog_button' + (rowCount + 1) + '" name="blog_button' + (rowCount + 1) + '" type="button">Suggest Based on Blog</button><div class="tooltip-text">' + blogTooltipText + '</div></div><div class="tooltip"><button style="margin-left: 4px;" id="page_button' + (rowCount + 1) + '" class="page_button' + (rowCount + 1) + '" name="page_button' + (rowCount + 1) + '" type="button">Suggest Based on Pages</button><div class="tooltip-text">'+pageTooltipText+'</div></div><td><div class="tooltip"><button style="margin-left: 4px;" id="seo_button' + (rowCount + 1) + '" class="seo_button' + (rowCount + 1) + '" name="seo_button' + (rowCount + 1) + '"  type="button">Suggest SEO Terms Based on Current Post Title</button><div class="tooltip-text">' + seoTooltipText + '</div></div></td>';
-                if (<?php echo $woocommerce_active ? 'true' : 'false'; ?>) {
-                    newButton.innerHTML = '<td><div class="tooltip"><button id="blog_button' + (rowCount + 1) + '" class="blog_button' + (rowCount + 1) + '" name="blog_button' + (rowCount + 1) + '" type="button">Suggest Based on Blog</button><div class="tooltip-text">' + blogTooltipText + '</div></div><div class="tooltip"><button style="margin-left: 4px;" id="store_button' + (rowCount + 1) + '" class="store_button' + (rowCount + 1) + '" name="store_button' + (rowCount + 1) + '" type="button">Suggest Based on Store</button><div class="tooltip-text">'+ storeTooltipText +'</div></div><div class="tooltip"><button style="margin-left: 4px;" id="page_button' + (rowCount + 1) + '" class="page_button' + (rowCount + 1) + '" name="page_button' + (rowCount + 1) + '" type="button">Suggest Based on Pages</button><div class="tooltip-text">'+pageTooltipText+'</div></div></td><td><div class="tooltip"><button style="margin-left: 4px;" id="seo_button' + (rowCount + 1) + '" class="seo_button' + (rowCount + 1) + '" name="seo_button' + (rowCount + 1) + '"  type="button">Suggest SEO Terms Based on Current Post Title</button><div class="tooltip-text">' + seoTooltipText + '</div></div></td>';
-                }
+                var newUnsplash = table.insertRow(-1);
+                newUnsplash.className = "unsplash_input"+ (rowCount + 1);
+                newUnsplash.style.display = "none";
+                var newDalle = table.insertRow(-1);
+                newDalle.className = "dalle_input"+ (rowCount + 1);
+                newDalle.style.display = "none";
 
+                newRow.innerHTML = '<td><textarea placeholder="New Blog Topic" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_' + (rowCount + 1) + 
+                '" style="resize: none; width: 100%;"></textarea></td><td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_' + (rowCount + 1) + 
+                '" style="resize: none; width: 100%;"></textarea></td><td class="radios"><input type="radio" name="royalty'+ (rowCount + 1) +
+                '" id="royalty'+ (rowCount + 1) +'">Royalty Free from Unsplash <br><input type="radio" name="dall-e'+ (rowCount + 1) +'" id="dall-e'+ (rowCount + 1) +'">Generate with DALL-E 2</td>';
+
+                newUnsplash.innerHTML =`<td class="default_image${rowCount + 1}" colspan="3">
+                                <div id="image_table_settings">
+                                    <div>
+                                        <label for="ai_post_featured_image${rowCount + 1}">
+                                        ${'Featured Image'} 
+                                        </label><br />
+                                        <input type="text" id="ai_post_featured_image${rowCount + 1}" name="ai_post_featured_image${rowCount + 1}" style="width: 25%;" />
+                                        <input type="button" class="button" id="upload_image_button${rowCount + 1}" value="${'Upload Image'}" />
+                                        <input type="button" class="button" id="unsplash_search_button${rowCount + 1}" value="${'Search Unsplash'}" />
+                                        <p class="description">
+                                        ${'Select or upload the default featured image for new posts.'}  
+                                        </p>
+                                </div>
+                                </div>
+                                <div id="result_image${rowCount + 1}" class="image-results"></div>
+                            </td>`;
+                newDalle.innerHTML =`<tr class="dalle_input${rowCount + 1}" style="display: none;">
+                                        <td class="dalle_image${rowCount + 1}" colspan="3">
+                                            <div id='dalle_table'>
+                                                <div>
+                                                    <label for="ai_post_dalle${rowCount + 1}">
+                                                    ${'Image Url'}
+                                                    </label>
+                                                    <br />
+                                                    <input type="text" id="ai_post_dalle${rowCount + 1}" name="ai_post_dalle${rowCount + 1}" style="width: 25%;"/>
+                                                    <input type="button" class="button" id="dalle_search_button${rowCount + 1}" value="${'Generate DALL-E 2'}" />
+                                                    <p class="description">
+                                                    ${'Type what you want to generate with DALL-E 2.'}  
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        <div id="dalle_result${rowCount + 1}" class="image-results"></div></td>
+							        </tr>`;
+                newButton.innerHTML = '<td><div class="tooltip"><button id="blog_button' + (rowCount + 1) + '" class="blog_button' + (rowCount + 1) + '" name="blog_button' + (rowCount + 1) + 
+                '" type="button">Suggest Based on Blog</button><div class="tooltip-text">' + blogTooltipText + '</div></div><div class="tooltip"><button style="margin-left: 4px;" id="page_button' + (rowCount + 1) + 
+                '" class="page_button' + (rowCount + 1) + '" name="page_button' + (rowCount + 1) + '" type="button">Suggest Based on Pages</button><div class="tooltip-text">'+pageTooltipText +
+                '</div></div><td><div class="tooltip"><button style="margin-left: 4px;" id="seo_button' + (rowCount + 1) + '" class="seo_button' + (rowCount + 1) + '" name="seo_button' + (rowCount + 1) + 
+                '"  type="button">Suggest SEO Terms Based on Current Post Title</button><div class="tooltip-text">' + seoTooltipText + '</div></div></td>';
+                if (<?php echo $woocommerce_active ? 'true' : 'false'; ?>) {
+                    newButton.innerHTML = '<td><div class="tooltip"><button id="blog_button' + (rowCount + 1) + '" class="blog_button' + (rowCount + 1) + '" name="blog_button' + (rowCount + 1) + 
+                    '" type="button">Suggest Based on Blog</button><div class="tooltip-text">' + blogTooltipText + 
+                    '</div></div><div class="tooltip"><button style="margin-left: 4px;" id="store_button' + (rowCount + 1) + '" class="store_button' + (rowCount + 1) + '" name="store_button' + (rowCount + 1) + 
+                    '" type="button">Suggest Based on Store</button><div class="tooltip-text">'+ storeTooltipText +
+                    '</div></div><div class="tooltip"><button style="margin-left: 4px;" id="page_button' + (rowCount + 1) + '" class="page_button' + (rowCount + 1) + '" name="page_button' + (rowCount + 1) + 
+                    '" type="button">Suggest Based on Pages</button><div class="tooltip-text">'+pageTooltipText+
+                    '</div></div></td><td><div class="tooltip"><button style="margin-left: 4px;" id="seo_button' + (rowCount + 1) + '" class="seo_button' + (rowCount + 1) + '" name="seo_button' + (rowCount + 1) + 
+                    '"  type="button">Suggest SEO Terms Based on Current Post Title</button><div class="tooltip-text">' + seoTooltipText + '</div></div></td>';
+                }
+                
                 jQuery("#scheduled-post-topics-table tbody tr.rowButton").each(function(index) {
                     if (index !== 0) {
                         var adjustedIndex = index + 1;
@@ -383,9 +440,145 @@ function more_fields() {
                             });
                         });
                     }
+                    jQuery("#dall-e" + adjustedIndex).change(function() {
+                        if (jQuery(this).is(':checked')) {
+                            jQuery('.dalle_input'+adjustedIndex).css('display', 'table-row');
+                            jQuery('#dalle_search_button'+adjustedIndex).on('click', function () {
+                                if (!promptShownDa) {
+                                    promptShownDa = true;
+                                        var query = prompt('Enter your generation term for DALL-E 2 images:');
+                                        if (query && query.trim() !== '') {
+                                            jQuery.ajax({
+                                                url: ajaxurl, 
+                                                type: 'POST',
+                                                data: {
+                                                    action: 'key_send' 
+                                                },
+                                                success: function(response) {
+                                                    var openApiKey = response.open_api_key;
+                                                    var data = {
+                                                        prompt: query,
+                                                        n: 10,
+                                                        size: '512x512'
+                                                    };
+                                                    var headers = {
+                                                        "Authorization": "Bearer "+openApiKey,
+                                                        "Content-Type": "application/json"
+                                                    };
+                                                    jQuery.ajax({
+                                                        url: 'https://api.openai.com/v1/images/generations',
+                                                        type: 'POST',
+                                                        headers: headers,
+                                                        data: JSON.stringify(data),
+                                                        success: function(data) {
+                                                            var imageResults = jQuery('#dalle_result'+adjustedIndex);
+                                                            imageResults.empty();
+                                                            data.data.forEach(function(item) {
+
+                                                                var imageElement = '<img src="'+item.url+'" data-url="' + item.url + '" class="thumbnail-image">';
+                                                                imageResults.append(imageElement);
+                                                            });
+                                            
+                                                            imageResults.find('img').on('click', function() {
+                                                                var imageUrl = jQuery(this).data('url');
+                                                                jQuery('#ai_post_dalle'+adjustedIndex).val(imageUrl);
+                                                            });
+                                                            promptShownDa = false;
+                                                    },
+                                                    error: function() {
+                                                        alert('Error when generating images in DALL-E 2.');
+                                                        promptShownDa = false;
+                                                    }
+                                                });
+                                            }
+                                        });
+                                    } else {
+                                        promptShownDa = false;
+                                    }
+                                }
+                            });
+                    } else {
+                        jQuery('#dalle_input').css('display', 'none');
+                    }
+
+                    promptShownDa = false;
                 });
+                jQuery("#royalty" + adjustedIndex).change(function() {
+                    if (jQuery(this).is(':checked')) {
+                        jQuery('.unsplash_input'+adjustedIndex).css('display', 'table-row');
+                            jQuery('#unsplash_search_button'+adjustedIndex).on('click', function () {
+                                if (!promptShownUn) {
+                                    var query = prompt('Enter your search term for Unsplash images:');
+                                    if (query && query.trim() !== '') {
+                                        jQuery.ajax({
+                                            url: ajaxurl, 
+                                            type: 'POST',
+                                            data: {
+                                                action: 'key_send' 
+                                            },
+                                            success: function(response) {
+                                                var unsplashApiKey = response.unsplash_api_key;
+                                                jQuery.ajax({
+                                                    url: 'https://api.unsplash.com/search/photos',
+                                                    method: 'GET',
+                                                    headers: {
+                                                        'Authorization': 'Client-ID ' + unsplashApiKey
+                                                    },
+                                                    data: {
+                                                        query: query
+                                                    },
+                                                    success: function(data) {
+                                                        var imageResults = jQuery('#result_image'+adjustedIndex);
+                                                        imageResults.empty();
+                                        
+                                                        data.results.forEach(function(photo) {
+                                                            var imageElement = '<img src="' + photo.urls.thumb + '" alt="' + photo.alt_description + '" data-url="' + photo.urls.regular + '" class="thumbnail-image">';
+                                                            imageResults.append(imageElement);
+                                                        });
+                                        
+                                                        imageResults.find('img').on('click', function() {
+                                                            var imageUrl = jQuery(this).data('url');
+                                                            jQuery('#ai_post_featured_image'+adjustedIndex).val(imageUrl);
+                                                        });
+                                                    },
+                                                    error: function() {
+                                                        alert('Error when searching for images on Unsplash.');
+                                                    }
+                                                });
+                                            }
+                                        });
+                                    }
+                                    promptShownUn = true;
+                                }
+                            });
+
+                            jQuery('#upload_image_button'+adjustedIndex).on('click', function () {
+                            // Check if defaultImageField exists and is empty or not set
+                                if (typeof wp !== 'undefined' && wp.media && wp.media.editor) {
+                                    wp.media.editor.send.attachment = function(props, attachment) {
+                                        updateImage(attachment.url);
+                                    };
+                                wp.media.editor.open('#upload_image_button'+adjustedIndex);
+                                } else {
+                                    // If the field is already set, allow the user to update the image
+                                    var imageUrl = defaultImageField.value;
+                                    wp.media.editor.send.attachment = function(props, attachment) {
+                                    updateImage(attachment.url);
+                                };
+                                wp.media.editor.open('#upload_image_button'+adjustedIndex, imageUrl);
+                            }
+                            return false;
+                        });
+
+                    } else {
+                        jQuery('.unsplash_input').css('display', 'none');
+                    }
+                });
+                promptShownUn = false;
+
             });
         });
+    });
     </script>
 <?php
 }
@@ -687,4 +880,88 @@ function ai_blog_existent_pages_generator () {
             echo "Error: " . wp_remote_retrieve_response_code($response);
         }
     }  
+}
+
+add_action('admin_footer', 'unsplash');
+
+function unsplash() { ?>
+    <script>
+        jQuery("#scheduled-post-topics-table tbody tr.row").each(function(index) {
+            var adjustedIndex = index + 1;
+            jQuery("#royalty" + adjustedIndex).change(function() {
+                if (jQuery(this).is(':checked')) {
+                    jQuery('.unsplash_input'+adjustedIndex).css('display', 'table-row');
+                        jQuery('#unsplash_search_button'+adjustedIndex).on('click', function () {
+                            var query = prompt('Enter your search term for Unsplash images:');
+                            if (query && query.trim() !== '') {
+                                jQuery.ajax({
+                                    url: ajaxurl, 
+                                    type: 'POST',
+                                    data: {
+                                        action: 'key_send' 
+                                    },
+                                    success: function(response) {
+                                        var unsplashApiKey = response.unsplash_api_key;
+                                        jQuery.ajax({
+                                            url: 'https://api.unsplash.com/search/photos',
+                                            method: 'GET',
+                                            headers: {
+                                                'Authorization': 'Client-ID ' + unsplashApiKey
+                                            },
+                                            data: {
+                                                query: query
+                                            },
+                                            success: function(data) {
+                                                var imageResults = jQuery('#result_image'+adjustedIndex);
+                                                imageResults.empty();
+                                
+                                                data.results.forEach(function(photo) {
+                                                    var imageElement = '<img src="' + photo.urls.thumb + '" alt="' + photo.alt_description + '" data-url="' + photo.urls.regular + '" class="thumbnail-image">';
+                                                    imageResults.append(imageElement);
+                                                });
+                                
+                                                imageResults.find('img').on('click', function() {
+                                                    var imageUrl = jQuery(this).data('url');
+                                                    jQuery('#ai_post_featured_image'+adjustedIndex).val(imageUrl);
+                                                });
+                                            },
+                                            error: function() {
+                                                alert('Error when searching for images on Unsplash.');
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        });
+
+                        jQuery('#upload_image_button'+adjustedIndex).on('click', function () {
+                        // Check if defaultImageField exists and is empty or not set
+                            if (typeof wp !== 'undefined' && wp.media && wp.media.editor) {
+                                wp.media.editor.send.attachment = function(props, attachment) {
+                                    updateImage(attachment.url);
+                                };
+                            wp.media.editor.open('#upload_image_button'+adjustedIndex);
+                            } else {
+                                // If the field is already set, allow the user to update the image
+                                var imageUrl = defaultImageField.value;
+                                wp.media.editor.send.attachment = function(props, attachment) {
+                                updateImage(attachment.url);
+                            };
+                            wp.media.editor.open('#upload_image_button'+adjustedIndex, imageUrl);
+                        }
+                        return false;
+                    });
+
+                } else {
+                    jQuery('.unsplash_input').css('display', 'none');
+                }
+            });
+        });
+    </script>
+<?php
+}
+
+
+function unsplash_generator() {
+
 }

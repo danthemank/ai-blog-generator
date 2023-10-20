@@ -56,3 +56,11 @@
     height: 180px;
 	cursor:pointer;
 }
+
+.radios {
+	width: 17%;
+}
+
+#image_table_settings {
+	width: 80%;
+}

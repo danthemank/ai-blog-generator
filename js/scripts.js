@@ -162,6 +162,66 @@ document.addEventListener('DOMContentLoaded', function() {
 			}
 		});
 	}
+
+
+	
+	jQuery("#scheduled-post-topics-table tbody tr.row").each(function(index) {
+		var adjustedIndex = index + 1;
+		jQuery("#dall-e" + adjustedIndex).change(function() {
+			if (jQuery(this).is(':checked')) {
+				jQuery('.dalle_input'+adjustedIndex).css('display', 'table-row');
+					jQuery('#dalle_search_button'+adjustedIndex).on('click', function () {
+						var query = prompt('Enter your generation term for DALL-E 2 images:');
+						if (query && query.trim() !== '') {
+							jQuery.ajax({
+								url: ajaxurl, 
+								type: 'POST',
+								data: {
+									action: 'key_send' 
+								},
+								success: function(response) {
+									var openApiKey = response.open_api_key;
+									var data = {
+										prompt: query,
+										n: 10,
+										size: '512x512'
+									};
+									var headers = {
+										"Authorization": "Bearer "+openApiKey,
+										"Content-Type": "application/json"
+									};
+									jQuery.ajax({
+										url: 'https://api.openai.com/v1/images/generations',
+										type: 'POST',
+										headers: headers,
+										data: JSON.stringify(data),
+										success: function(data) {
+											var imageResults = jQuery('#dalle_result'+adjustedIndex);
+											imageResults.empty();
+											data.data.forEach(function(item) {
+
+												var imageElement = '<img src="'+item.url+'" data-url="' + item.url + '" class="thumbnail-image">';
+												imageResults.append(imageElement);
+											});
+							
+											imageResults.find('img').on('click', function() {
+												var imageUrl = jQuery(this).data('url');
+												jQuery('#ai_post_dalle'+adjustedIndex).val(imageUrl);
+											});
+										},
+										error: function() {
+											alert('Error when generating images in DALL-E 2.');
+										}
+									});
+								}
+							});
+						}
+					});
+			} else {
+				jQuery('#dalle_input').css('display', 'none');
+			}
+		});
+	});
 });
 
 jQuery(document).ready(function() {

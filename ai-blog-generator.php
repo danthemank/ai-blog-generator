@@ -833,10 +833,10 @@ class ai_blog_post_generator {
 		if($attachment_id){
 			set_post_thumbnail($post_id, $attachment_id);
 		}
-
 		if (!empty($this->ai_post_default_featured_image)) {
 			// Attach the default featured image to the post
 			$image_id = attachment_url_to_postid($this->ai_post_default_featured_image);
+
 			if ($image_id) {
 				set_post_thumbnail($post_id, $image_id);
 			}
@@ -1173,13 +1173,24 @@ class ai_blog_post_generator {
 						foreach ($this->saved_prompts as $index => $prompt) {
 							$term = isset($this->saved_terms[$index]) ? $this->saved_terms[$index] : ''; // Get the corresponding term
 
-							echo '<tr>';
+							echo '<tr class="row">';
 							// Display the textarea for prompt
 								echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;">' . esc_textarea($prompt['prompt']) . '</textarea></td>';
 								// Display the textarea for terms
 								echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;">' . esc_textarea($term['term']) . '</textarea></td>';
+
+								echo '<td class="radios"><input type="radio" name="royalty1" id="royalty1">Royalty Free from Unsplash <br><input type="radio" name="dall-e1" id="dall-e1">Generate with DALL-E 2</td>';
 							echo '</tr>';
-						}
+							?>
+							<tr class="unsplash_input1" style="display: none;">
+								<td class="default_image1"  colspan="3"><?php echo $this->ai_post_featured_image_callback(); ?>
+								<div id="result_image1" class="image-results"></div></td>
+							</tr>
+							<tr class="dalle_input1" style="display: none;">
+								<td class="dalle_image1" colspan="3"><?php echo $this->ai_post_dalle2(); ?>
+								<div id="dalle_result1" class="image-results"></div></td>
+							</tr>
+						<?php }
 					} else {
 						// Display the textarea for prompt
 						echo '<tr class="row"><td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;"></textarea></td>';
@@ -1280,6 +1291,31 @@ class ai_blog_post_generator {
 		</div>
 		<?php
 	}
+
+	public function ai_post_featured_image_callback() {
+		?>
+		<div id='image_table_settings'>
+			<div>
+				<label for="ai_post_featured_image">
+				<?php _e('Featured Image', 'textdomain'); ?>
+				</label>
+				<br />
+				<input type="text" id="ai_post_featured_image1" name="ai_post_featured_image1" style="width: 25%;"/>
+				<input type="button" class="button" id="upload_image_button1" value="<?php _e('Upload Image', 'textdomain'); ?>" />
+				<?php
+					if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
+						?>
+						<input type="button" class="button" id="unsplash_search_button1" value="<?php _e('Search Unsplash', 'textdomain'); ?>" />
+						<?php
+					}
+				?>
+				<p class="description">
+					<?php _e('Select or upload the default featured image for new posts.', 'textdomain'); ?>
+				</p>
+			</div>		
+		</div>
+		<?php
+	}
 	
 	public function ai_post_unsplash_images() {
 		?>
@@ -1300,6 +1336,30 @@ class ai_blog_post_generator {
 					if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
 						?>
 						<input type="button" class="button" id="dalle_search_button" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
+						<?php
+					}
+				?>
+				<p class="description">
+					<?php _e('Type what you want to generate with DALL-E 2.', 'textdomain'); ?>
+				</p>
+			</div>
+		</div>
+		<?php
+	}
+
+	public function ai_post_dalle2() {
+		?>
+		<div id='dalle_table'>
+			<div>
+				<label for="ai_post_dalle1">
+				<?php _e('Image Url', 'textdomain'); ?>
+				</label>
+				<br />
+				<input type="text" id="ai_post_dalle1" name="ai_post_dalle1" style="width: 25%;"/>
+				<?php
+					if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
+						?>
+						<input type="button" class="button" id="dalle_search_button1" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
 						<?php
 					}
 				?>
