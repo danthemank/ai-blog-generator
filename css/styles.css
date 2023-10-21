@@ -64,3 +64,10 @@
 #image_table_settings {
 	width: 80%;
 }
+
+.image_thumbnail {
+	max-height: 280px;
+    max-width: 300px; 
+    width: 100%; 
+    height: auto;
+}

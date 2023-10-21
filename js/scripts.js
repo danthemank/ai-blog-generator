@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			if (jQuery(this).is(':checked')) {
 				jQuery('.dalle_input'+adjustedIndex).css('display', 'table-row');
 					jQuery('#dalle_search_button'+adjustedIndex).on('click', function () {
-						var query = prompt('Enter your generation term for DALL-E 2 images:');
+						var query = jQuery("#ai_post_dalle"+adjustedIndex).val()
 						if (query && query.trim() !== '') {
 							jQuery.ajax({
 								url: ajaxurl, 
@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
 							
 											imageResults.find('img').on('click', function() {
 												var imageUrl = jQuery(this).data('url');
-												jQuery('#ai_post_dalle'+adjustedIndex).val(imageUrl);
+												jQuery('#dalle_url'+adjustedIndex).val(imageUrl);
 											});
 										},
 										error: function() {

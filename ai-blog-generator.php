@@ -30,6 +30,8 @@ class ai_blog_post_generator {
 	private $unsplash_secret_key;
 	private $saved_prompts;
 	private $saved_terms;
+	private $saved_unsplash;
+	private $saved_dalle;
 	private $schedule_frequency;
 	private $languages;
 	private $plugin_name;
@@ -76,7 +78,8 @@ class ai_blog_post_generator {
 			$prompt_seo_terms = get_option('ai_blog_generator_prompt_seo_terms');
 			$this->saved_prompts = array();
 			$this->saved_terms = array();
-			
+			$this->saved_unsplash = array();
+			$this->saved_dalle = array();
 			if (!empty($prompt_seo_terms) && is_array($prompt_seo_terms)) {
 				foreach ($prompt_seo_terms as $prompt_terms) {
 					if (isset($prompt_terms['prompt'])) {
@@ -84,6 +87,12 @@ class ai_blog_post_generator {
 					}
 					else if (isset($prompt_terms['term'])) {
 						$this->saved_terms[] = $prompt_terms;
+					}
+					else if (isset($prompt_terms['unsplash'])) {
+						$this->saved_unsplash[] = $prompt_terms;
+					}
+					else if (isset($prompt_terms['dalle'])) {
+						$this->saved_dalle[] = $prompt_terms;
 					}
 				}
 			}
@@ -705,7 +714,6 @@ class ai_blog_post_generator {
 			}
 
 			wp_redirect($redirect_link);
-			exit;
 		}
 		else {
 			echo "There was an error generating the post content.";
@@ -781,6 +789,7 @@ class ai_blog_post_generator {
 	}
 
     public function generate_post($post_title, $post_content, $seo_terms, $post_category, $post_comment_status, $generated_excerpt, $post_image = '') {
+		require_once("wp-load.php");
 		$attachment_id = '';
 		$image_data = '';
         $default_post_status = $this->ai_post_default_status ?: 'draft';
@@ -807,8 +816,23 @@ class ai_blog_post_generator {
 				'post_status'    => 'inherit'
 			);
 			$attachment_id = wp_insert_attachment($attachment, $file);
-			
-			wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $file));
+
+			$attachment_metadata = array(
+				'width' => 1080, 
+				'height' => 720, 
+				'file' => $file,
+				'sizes' => array(
+					'thumbnail' => array(
+						'file' => $filename . '-150x150.jpg', 
+						'width' => 150, 
+						'height' => 150, 
+					),
+				),
+			);
+
+			if ($attachment_id) {
+				update_post_meta($attachment_id, '_wp_attachment_metadata', $attachment_metadata);
+			}
 		}
 		
 		// Create new post
@@ -1159,93 +1183,241 @@ class ai_blog_post_generator {
 		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			?>
 			<table class="widefat striped" id="scheduled-post-topics-table">
-			<thead>
-				<tr>
-					<th style="padding-left:15px;">Blog Topics</th>
-					<th style="padding-left:15px;">SEO Terms</th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php
-					// Display the existing prompt and terms pairs
-
-					if (!empty($this->saved_prompts)) {
-						foreach ($this->saved_prompts as $index => $prompt) {
-							$term = isset($this->saved_terms[$index]) ? $this->saved_terms[$index] : ''; // Get the corresponding term
-
-							echo '<tr class="row">';
-							// Display the textarea for prompt
+				<thead>
+					<tr>
+						<th style="padding-left:15px;">Blog Topics</th>
+						<th style="padding-left:15px;">SEO Terms</th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php
+						// Display the existing prompt and terms pairs
+						if (!empty($this->saved_prompts)) {
+							foreach ($this->saved_prompts as $index => $prompt) {
+								$term = isset($this->saved_terms[$index]) ? $this->saved_terms[$index] : ''; // Get the corresponding term
+								echo '<tr class="row">';
+								// Display the textarea for prompt
 								echo '<td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;">' . esc_textarea($prompt['prompt']) . '</textarea></td>';
 								// Display the textarea for terms
 								echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;">' . esc_textarea($term['term']) . '</textarea></td>';
 
-								echo '<td class="radios"><input type="radio" name="royalty[1]" class="royalty1" id="royalty[1]">Royalty Free from Unsplash <br><input type="radio" name="dall-e[1]" class="dall-e1" id="dall-e[1]">Generate with DALL-E 2</td>';
-							echo '</tr>';
-							?>
-							<tr class="unsplash_input1" style="display: none;">
-								<td class="default_image1"  colspan="3"><?php echo $this->ai_post_featured_image_callback(); ?>
-								<div id="result_image1" class="image-results"></div></td>
-							</tr>
-							<tr class="dalle_input1" style="display: none;">
-								<td class="dalle_image1" colspan="3"><?php echo $this->ai_post_dalle2(); ?>
-								<div id="dalle_result1" class="image-results"></div></td>
-							</tr>
-						<?php }
-					} else {
-						// Display the textarea for prompt
-						echo '<tr class="row"><td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;"></textarea></td>';
+								echo '<td class="radios"><input type="radio" name="royalty'.($index+1).'" class="royalty'.($index+1).'" id="royalty'.($index+1).'">Royalty Free from Unsplash <br><input type="radio" name="dall-e'.($index+1).'" class="dall-e'.($index+1).'" id="dall-e'.($index+1).'">Generate with DALL-E 2</td>';
+								echo '</tr>';
+								if ( !empty($this->saved_unsplash[$index]['unsplash']) ) {
+								?>	
+									<tr class="unsplash_input<?php echo $index+1; ?>" style="display: table-row;">
+										<td class="default_image<?php echo $index+1; ?>"  colspan="3">
+										<div id='image_table_settings'>
+											<div>
+												<label for="ai_post_featured_image">
+												<?php _e('Search unsplash or upload an image from the media library, for new posts.', 'textdomain'); ?>
+												</label>
+												<br />
+												<input type="text" id="ai_post_featured_image<?php echo $index+1; ?>" name="ai_post_featured_image<?php echo $index+1; ?>" style="width: 25%;"/>
+												<input type="button" class="button" id="upload_image_button<?php echo $index+1; ?>" value="<?php _e('Upload Image', 'textdomain'); ?>" />
+												<?php
+													if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
+														?>
+														<input type="button" class="button" id="unsplash_search_button<?php echo $index+1; ?>" value="<?php _e('Search Unsplash', 'textdomain'); ?>" />
+														<?php
+													}
+												?>
+											</div>		
+										</div>
+										<div id="result_image<?php echo $index+1; ?>" class="image-results">
+										<br>
+											<img src="<?php echo $this->saved_unsplash[$index]['unsplash'] ;?>" class="image_thumbnail">
+										</div>
+										<input type="hidden" name="ai_blog_generator_prompt_seo_terms[][unsplash]" id="unsplash_url<?php echo $index+1; ?>" value="<?php echo $this->saved_unsplash[$index]['unsplash'] ;?>"></td>
+									</tr>
+									<?php
+								}	 else {
+									?>
+									<tr class="unsplash_input<?php echo $index+1; ?>" style="display: none;">
+										<td class="default_image<?php echo $index+1; ?>"  colspan="3">
+										<div id='image_table_settings'>
+											<div>
+												<label for="ai_post_featured_image">
+												<?php _e('Search unsplash or upload an image from the media library, for new posts.', 'textdomain'); ?>
+												</label>
+												<br />
+												<input type="text" id="ai_post_featured_image<?php echo $index+1; ?>" name="ai_post_featured_image<?php echo $index+1; ?>" style="width: 25%;"/>
+												<input type="button" class="button" id="upload_image_button<?php echo $index+1; ?>" value="<?php _e('Upload Image', 'textdomain'); ?>" />
+												<?php
+													if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
+														?>
+														<input type="button" class="button" id="unsplash_search_button<?php echo $index+1; ?>" value="<?php _e('Search Unsplash', 'textdomain'); ?>" />
+														<?php
+													}
+												?>
+											</div>		
+										</div>
+										<div id="result_image<?php echo $index+1; ?>" class="image-results">
+										</div>
+										<input type="hidden" name="ai_blog_generator_prompt_seo_terms[][unsplash]" id="unsplash_url<?php echo $index+1; ?>"></td>
+								<?php
+								}
+								if ( !empty($this->saved_dalle[$index]['dalle']) ) {
+									?>	
+									<tr class="dalle_input<?php echo $index+1; ?>" style="display: table-row;">
+										<td class="dalle_image<?php echo $index+1; ?>" colspan="3">
+											<div id='dalle_table'>
+												<div>
+													<label for="ai_post_dalle<?php echo $index+1; ?>">
+													<?php _e('Type what you want to generate with DALL-E 2.', 'textdomain'); ?>
+													</label>
+													<br />
+													<input type="text" id="ai_post_dalle<?php echo $index+1; ?>" name="ai_post_dalle<?php echo $index+1; ?>" style="width: 25%;"/>
+													<?php
+														if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
+															?>
+															<input type="button" class="button" id="dalle_search_button<?php echo $index+1; ?>" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
+															<?php
+														}
+													?>
+												</div>
+											</div>
+											<div id="dalle_result<?php echo $index+1; ?>" class="image-results">
+												<br>
+												<img src="<?php echo $this->saved_dalle[$index]['dalle'] ;?>"  class="image_thumbnail">
+											</div>
+											<input name="ai_blog_generator_prompt_seo_terms[][dalle]" type="hidden" id="dalle_url<?php echo $index+1; ?>" value="<?php echo $this->saved_dalle[$index]['dalle'] ;?>">
+										</td>
+									</tr>
+										<?php
+									} else {
+										?>
+										<tr class="dalle_input<?php echo $index+1; ?>" style="display: none;">
+											<td class="dalle_image<?php echo $index+1; ?>" colspan="3">
+												<div id='dalle_table'>
+													<div>
+														<label for="ai_post_dalle<?php echo $index+1; ?>">
+														<?php _e('Type what you want to generate with DALL-E 2.', 'textdomain'); ?>
+														</label>
+														<br />
+														<input type="text" id="ai_post_dalle<?php echo $index+1; ?>" name="ai_post_dalle<?php echo $index+1; ?>" style="width: 25%;"/>
+														<?php
+															if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
+																?>
+																<input type="button" class="button" id="dalle_search_button<?php echo $index+1; ?>" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
+																<?php
+															}
+														?>
+													</div>
+												</div>
+												<div id="dalle_result<?php echo $index+1; ?>" class="image-results"></div>
+												<input name="ai_blog_generator_prompt_seo_terms[][dalle]" type="hidden" id="dalle_url<?php echo $index+1; ?>">
+											</td>
+									</tr>
+									<?php
+									} 
+								}
+							} else {
+									// Display the textarea for prompt
+									echo '<tr class="row"><td><textarea placeholder="New Blog Prompt" name="ai_blog_generator_prompt_seo_terms[][prompt]" id="prompt_1" style="resize: none; width: 100%;"></textarea></td>';
 
-						// Display the textarea for terms
-						echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;"></textarea></td></tr>';
-					}
-				?>
-			<tr class ="rowButton">
-				<td>
-					<div class="tooltip">
-						<button id="blog_button1" class="blog_button1" name="blog_button1" type="button">Suggest Based on Blog</button>
-						<div class="tooltip-text">
-							<?php
-							echo "Generate a blog post topic + relevant SEO terms based on existing posts within your website's blog.";
-							?>
-						</div>
-					</div>
-					<?php 
-					if (is_plugin_active('woocommerce/woocommerce.php')) {
-					
+									// Display the textarea for terms
+									echo '<td><textarea placeholder="SEO Terms" name="ai_blog_generator_prompt_seo_terms[][term]" id="term_1" style="resize: none; width: 100%;"></textarea></td>';
+									echo '<td class="radios"><input type="radio" name="royalty1" class="royalty1" id="royalty1">Royalty Free from Unsplash <br><input type="radio" name="dall-e1" class="dall-e1" id="dall-e1">Generate with DALL-E 2</td>';
+									echo '</tr>';
+
+									?>
+									<tr class="unsplash_input1" style="display: none;">
+										<td class="default_image1"  colspan="3">
+											<div id='image_table_settings'>
+												<div>
+													<label for="ai_post_featured_image">
+													<?php _e('Search unsplash or upload an image from the media library, for new posts.', 'textdomain'); ?>
+													</label>
+													<br />
+													<input type="text" id="ai_post_featured_image1" name="ai_post_featured_image1" style="width: 25%;"/>
+													<input type="button" class="button" id="upload_image_button1" value="<?php _e('Upload Image', 'textdomain'); ?>" />
+													<?php
+														if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
+															?>
+															<input type="button" class="button" id="unsplash_search_button1" value="<?php _e('Search Unsplash', 'textdomain'); ?>" />
+															<?php
+														}
+													?>
+												</div>		
+											</div>
+											<div id="result_image1" class="image-results">
+											</div>
+											<input type="hidden" name="ai_blog_generator_prompt_seo_terms[][unsplash]" id="unsplash_url1">
+										</td>
+									</tr>
+									<tr class="dalle_input1" style="display: none;">
+											<td class="dalle_image1" colspan="3">
+												<div id='dalle_table'>
+													<div>
+														<label for="ai_post_dalle1">
+														<?php _e('Type what you want to generate with DALL-E 2.', 'textdomain'); ?>
+														</label>
+														<br />
+														<input type="text" id="ai_post_dalle1" name="ai_post_dalle1" style="width: 25%;"/>
+														<?php
+															if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
+																?>
+																<input type="button" class="button" id="dalle_search_button1" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
+																<?php
+															}
+														?>
+													</div>
+												</div>
+												<div id="dalle_result1" class="image-results"></div>
+												<input name="ai_blog_generator_prompt_seo_terms[][dalle]" type="hidden" id="dalle_url1">
+											</td>
+									</tr>
+						<?php
+						}
 					?>
-						<div class="tooltip">
-								<button id="store_button1" class="store_button1" name="store_button1" type="button">Suggest Based on Store</button>
+					<tr class ="rowButton">
+						<td>
+							<div class="tooltip">
+								<button id="blog_button1" class="blog_button1" name="blog_button1" type="button">Suggest Based on Blog</button>
 								<div class="tooltip-text">
 									<?php
-									echo "Generate a blog post topic + relevant SEO terms based on existing products in your woocommerce store.";
+									echo "Generate a blog post topic + relevant SEO terms based on existing posts within your website's blog.";
 									?>
 								</div>
-						</div>
-					<?php } ?>
-					<div class="tooltip">
-						<button id="page_button1" class="page_button1" name="page_button1" type="button">Suggest Based on Pages</button>
-						<div class="tooltip-text">
-							<?php
-							echo "Generate a blog post topic + relevant SEO terms based on existing pages in your website.";
+							</div>
+							<?php 
+							if (is_plugin_active('woocommerce/woocommerce.php')) {
+							
 							?>
-						</div>
-					</div>
-				</td>
-				<td>
-					<div class="tooltip">
-						<button id="seo_button1" class="seo_button1" name="seo_button1" type="button">Suggest SEO Terms Based on Current Post Title</button>
-						<div class="tooltip-text">
-							<?php
-							echo "Generate a list of SEO terms based on the Blog Post Topic.";
-							?>
-						</div>
-					</div>
-				</td>
-			</tr>
-			</tbody>
-		</table>
-		<input style="margin-top: 15px;" type="button" id="more_fields" value="Add More" class="btn btn-info" />
-		<?php
+								<div class="tooltip">
+										<button id="store_button1" class="store_button1" name="store_button1" type="button">Suggest Based on Store</button>
+										<div class="tooltip-text">
+											<?php
+											echo "Generate a blog post topic + relevant SEO terms based on existing products in your woocommerce store.";
+											?>
+										</div>
+								</div>
+							<?php } ?>
+							<div class="tooltip">
+								<button id="page_button1" class="page_button1" name="page_button1" type="button">Suggest Based on Pages</button>
+								<div class="tooltip-text">
+									<?php
+									echo "Generate a blog post topic + relevant SEO terms based on existing pages in your website.";
+									?>
+								</div>
+							</div>
+						</td>
+						<td>
+							<div class="tooltip">
+								<button id="seo_button1" class="seo_button1" name="seo_button1" type="button">Suggest SEO Terms Based on Current Post Title</button>
+								<div class="tooltip-text">
+									<?php
+									echo "Generate a list of SEO terms based on the Blog Post Topic.";
+									?>
+								</div>
+							</div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<input style="margin-top: 15px;" type="button" id="more_fields" value="Add More" class="btn btn-info" />
+			<?php
 		}
 	}
 	
@@ -1291,31 +1463,6 @@ class ai_blog_post_generator {
 		</div>
 		<?php
 	}
-
-	public function ai_post_featured_image_callback() {
-		?>
-		<div id='image_table_settings'>
-			<div>
-				<label for="ai_post_featured_image">
-				<?php _e('Featured Image', 'textdomain'); ?>
-				</label>
-				<br />
-				<input type="text" id="ai_post_featured_image1" name="ai_post_featured_image1" style="width: 25%;"/>
-				<input type="button" class="button" id="upload_image_button1" value="<?php _e('Upload Image', 'textdomain'); ?>" />
-				<?php
-					if(isset($this->unsplash_api_key) && esc_attr($this->unsplash_api_key) !== '') {
-						?>
-						<input type="button" class="button" id="unsplash_search_button1" value="<?php _e('Search Unsplash', 'textdomain'); ?>" />
-						<?php
-					}
-				?>
-				<p class="description">
-					<?php _e('Select or upload the default featured image for new posts.', 'textdomain'); ?>
-				</p>
-			</div>		
-		</div>
-		<?php
-	}
 	
 	public function ai_post_unsplash_images() {
 		?>
@@ -1336,30 +1483,6 @@ class ai_blog_post_generator {
 					if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
 						?>
 						<input type="button" class="button" id="dalle_search_button" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
-						<?php
-					}
-				?>
-				<p class="description">
-					<?php _e('Type what you want to generate with DALL-E 2.', 'textdomain'); ?>
-				</p>
-			</div>
-		</div>
-		<?php
-	}
-
-	public function ai_post_dalle2() {
-		?>
-		<div id='dalle_table'>
-			<div>
-				<label for="ai_post_dalle1">
-				<?php _e('Image Url', 'textdomain'); ?>
-				</label>
-				<br />
-				<input type="text" id="ai_post_dalle1" name="ai_post_dalle1" style="width: 25%;"/>
-				<?php
-					if(isset($this->openai_api_key) && esc_attr($this->openai_api_key) !== '') {
-						?>
-						<input type="button" class="button" id="dalle_search_button1" value="<?php _e('Generate DALL-E 2', 'textdomain'); ?>" />
 						<?php
 					}
 				?>
@@ -1406,12 +1529,14 @@ class ai_blog_post_generator {
 		
 		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			$submitted_data = $input['ai_blog_generator_prompt_seo_terms'];
-			$formatted_data = array('prompts' => array(), 'terms' => array());
+			$formatted_data = array('prompts' => array(), 'terms' => array(),'unsplash' => array(),'dalle' => array());
 
 			foreach ($submitted_data as $entry) {
 				if(isset($entry['prompt']) && $entry['prompt'] !== "") {
 					$formatted_data['prompts'][] = sanitize_text_field($entry['prompt']);
 					$formatted_data['terms'][] = sanitize_text_field($entry['terms']);
+					$formatted_data['unsplash'][] = sanitize_text_field($entry['unsplash']);
+					$formatted_data['dalle'][] = sanitize_text_field($entry['dalle']);
 				}
 			}
 
@@ -1442,24 +1567,26 @@ class ai_blog_post_generator {
 		}
     }
 	
-	public function generate_scheduled_post() {	
+	public function generate_scheduled_post() {
 		$prompt_seo_terms = [];
 		if(isset($this->license_isactive) && $this->license_isactive == 'active') {
 			if (!empty($this->saved_prompts)) {
-				//We need pick one, maybe a setting is needed to determine how best to do this, but for now we will just take the first one that is available
-				$prompt = $this->saved_prompts[0];
-				$seo_terms = $this->saved_terms[0];
-				$post_length = $this->ai_default_post_length;
-				$post_category = $this->ai_post_default_category;
-				$generate_excerpt = $this->ai_default_generate_excerpt;
-				$excerpt_length = $this->ai_default_excerpt_length;
-				$post_comment_status = $this->ai_post_default_comment_status;
-				$post_language = $this->ai_post_default_language;
+				foreach ($this->saved_prompts as $index => $promp) {
+					//We need pick one, maybe a setting is needed to determine how best to do this, but for now we will just take the first one that is available
+					$prompt = $this->saved_prompts[$index]['prompt'];
+					$seo_terms = $this->saved_terms[$index]['term'];
+					$post_image = !empty($this->saved_unsplash[$index]['unsplash']) ? $this->saved_unsplash[$index]['unsplash'] : (!empty($this->saved_dalle[$index]['dalle']) ? $this->saved_dalle[$index]['dalle'] : '');
+					$post_length = $this->ai_default_post_length;
+					$post_category = $this->ai_post_default_category;
+					$generate_excerpt = $this->ai_default_generate_excerpt;
+					$excerpt_length = $this->ai_default_excerpt_length;
+					$post_comment_status = $this->ai_post_default_comment_status;
+					$post_language = $this->ai_post_default_language;
 
-				if (!empty($prompt)) {
-					$this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language);
+					if (!empty($prompt)) {
+						$this->generate_blog_post($prompt, $seo_terms, $post_length, $post_category, $generate_excerpt, $excerpt_length, $post_comment_status, $post_language,$post_image);
+					}
 				}
-
 				// Update the stored prompts after generating posts
 				unset($prompt_seo_terms[$prompt]);
 				update_option('ai_blog_generator_prompt_seo_terms', $prompt_seo_terms);
@@ -1484,4 +1611,20 @@ function key_send() {
 }
 
 add_action('wp_ajax_key_send', 'key_send');
+
+function log_cron_events() {
+    // Ruta al archivo de registro (puedes personalizar esta ubicación)
+    $log_file = get_template_directory() . '/cron-events.log';
+
+    // Obtiene la hora actual
+    $current_time = date('Y-m-d H:i:s');
+
+    // Crea una entrada en el archivo de registro con la hora actual
+    file_put_contents($log_file, "Evento cron ejecutado a las $current_time\n", FILE_APPEND);
+}
+
+// Agrega un gancho para registrar eventos cron
+add_action('my_cron_event', 'log_cron_events');
+
 ?>
+
